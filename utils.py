@@ -1,5 +1,6 @@
 import librosa
 import numpy as np
+import pickle
 
 
 def melspectrogram(audio):
@@ -8,3 +9,8 @@ def melspectrogram(audio):
     mel_spec = np.dot(mel_basis, np.abs(spec))
     return np.log(mel_spec + 1e-6)
 
+def load_music():
+    with open('music_genres_dataset.pkl', 'rb') as f:
+        train_set = pickle.load(f)
+        test_set = pickle.load(f)
+    return train_set, test_set

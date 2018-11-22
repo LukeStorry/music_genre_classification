@@ -1,13 +1,9 @@
 import tensorflow as tf
 import librosa
-
 import pickle
+import utils
 
-def load_music():
-    with open('music_genres_dataset.pkl', 'rb') as f:
-        train_set = pickle.load(f)
-        test_set = pickle.load(f)
-    return train_set, test_set
+train_set, test_set = utils.load_music()
 
 xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
 
@@ -30,6 +26,3 @@ def shallownn(x_images):
         )
 
     flat_pool = tf.reshape(pool1, [-1, 5120])
-
-def main():
-    train_set, test_set = load_music()
