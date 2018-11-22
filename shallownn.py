@@ -56,6 +56,7 @@ def shallownn(x_images):
         activation=None,
         use_bias=True,
         trainable=True,
-        bias_initializer=tf.zeros_initializer(),
+        kernel_initializer=xavier_initializer,
+        bias_initializer=xavier_initializer,
         name='fc1'
     )
