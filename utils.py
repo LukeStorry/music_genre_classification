@@ -14,15 +14,8 @@ def melspectrogram(audio):
 def load_music():
     print("Loading data...")
     with open('music_genres_dataset.pkl', 'rb') as f:
-        train_set = test_set = {
-        'labels': [1,2,3,4,5,6],
-        'data' : [[11],  [22], [33], [44], [55], [66]],
-        'track_id': [1,1,1,1,2,2]
-        }
-
         train_set = pickle.load(f)
-        # test_set = pickle.load(f)
-
+        test_set = pickle.load(f)
     print("Music Data Loaded.")
     return train_set, test_set
 

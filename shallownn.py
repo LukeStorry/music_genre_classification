@@ -20,6 +20,13 @@ def graph(x):
         kernel_initializer=xavier_initializer,
         name='left_conv'
     )
+    left_pooling = tf.layers.max_pooling2d(
+        inputs=left_conv,
+        pool_size=[1, 20],
+        strides=2,
+        name='left_pooling'
+    )
+
     right_conv = tf.layers.conv2d(
         inputs=x,
         filters=16,
@@ -30,14 +37,6 @@ def graph(x):
         kernel_initializer=xavier_initializer,
         name='right_conv'
     )
-
-    left_pooling = tf.layers.max_pooling2d(
-        inputs=left_conv,
-        pool_size=[1, 20],
-        strides=2,
-        name='left_pooling'
-    )
-
     right_pooling = tf.layers.max_pooling2d(
         inputs=right_conv,
         strides=2,
@@ -50,7 +49,7 @@ def graph(x):
 
     merged = tf.concat([left_flattened, right_flattened], 1)
 
-    # TODO dropout() needs training bool hyperparameters
+    # TODO dropout() needs a 'training=' bool parameter
     dropout = tf.layers.dropout(merged, 0.1, name='dropout')
 
     fully_connected_layer = tf.layers.dense(

@@ -29,21 +29,15 @@ run_log_dir = os.path.join(FLAGS.log_dir, 'exp_'.format())
 def main(_):
     tf.reset_default_graph()
 
-    # Import data
-    train_set, test_set = utils.load_music()
-    train_indices = range(len(train_set['labels']))
-
     # Create the model
     with tf.variable_scope('inputs'):
-        x = tf.placeholder(tf.float32, [None, 80 * 80])
+        x = tf.placeholder(tf.float32, [None, 80, 80])
         x_reshaped = tf.reshape(x, [-1, 80, 80, 1])
-        y_ = tf.placeholder(tf.float32, [1])  # ten types of music
+        y_ = tf.placeholder(tf.int64, [None, ])  # ten types of music
 
     # Build the graph for the shallow network
     with tf.variable_scope('model'):
         final_layer = shallownn.graph(x_reshaped)
-        model = CallableModelWrapper(shallownn.graph, 'logits')
-
 
     # Define loss function - softmax_cross_entropy
     cross_entropy = tf.reduce_mean(
@@ -66,9 +60,11 @@ def main(_):
     # saver for checkpoints
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
 
+    # Import data
+    train_set, test_set = utils.load_music()
+
     with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter(
-            run_log_dir + '_train', sess.graph)
+        summary_writer = tf.summary.FileWriter(run_log_dir + '_train', sess.graph)
         summary_writer_validation = tf.summary.FileWriter(
             run_log_dir + '_validate', sess.graph)
 
@@ -76,22 +72,25 @@ def main(_):
 
         # Training and validation
         for epoch in range(FLAGS.max_epochs):
-
-            # shuffle data
-            np.random.shuffle(train_indices)
-            train_data = train_set['data'][train_indices]
-            train_labels = train_set['labels'][train_indices]
+            shuffled_indices = range(len(train_set['labels']))
+            np.random.shuffle(shuffled_indices)
+            train_labels = np.array(train_set['labels'])[shuffled_indices]
+            train_data = np.array(train_set['data'])[shuffled_indices]
 
             # training loop by batches
             for i in range(0, len(train_labels), FLAGS.batch_size):
-                spectrograms = map(utils.melspectrogram,
-                                   train_data[i:i + FLAGS.batch_size])
-                labels = train_labels[i:i + batch_size]
+                spectrograms = map(utils.melspectrogram, train_data[i:i + FLAGS.batch_size])
+                # flattened = map(lambda x: x.flatten().tolist(), spectrograms)
+                labels = train_labels[i:i + FLAGS.batch_size]
                 sess.run(train_step, feed_dict={x: spectrograms, y_: labels})
+                print i,
+            print
 
             # validation
+            vaildation_spectrograms = map(utils.melspectrogram, train_data[:FLAGS.batch_size])
             validation_accuracy, validation_summary_str = sess.run([accuracy, la_summary], feed_dict={
-                x: train_spectrograms[:FLAGS.batch_size],
+                # x:  map(lambda x: x.flatten().tolist(), vaildation_spectrograms),
+                x:  vaildation_spectrograms,
                 y_: train_labels[:FLAGS.batch_size]})
 
             summary_writer.add_summary(validation_summary_str, epoch)
@@ -106,7 +105,7 @@ def main(_):
         for i in range(0, len(test_set['labels']), FLAGS.batch_size):
             test_spectrograms = map(
                 utils.melspectrogram, test_set['data'][i:i + FLAGS.batch_size])
-            testLabels = test_set['labels'][i:i + FLAGS.batch_size]
+            test_labels = test_set['labels'][i:i + FLAGS.batch_size]
 
             test_accuracy_temp = sess.run(
                 accuracy, feed_dict={x: test_spectrograms, y_: testLabels})
