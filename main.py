@@ -39,21 +39,20 @@ def main(_):
     with tf.variable_scope('inputs'):
         # Create the model
         x = tf.placeholder(tf.float32, [None, 80*80]) # output from melspectrogram
-        y_ = tf.placeholder(tf.float32, [None, 10]) # ten types of music
+        y_ = tf.placeholder(tf.float32, [None, 1]) # ten types of music
 
     # Build the graph for the shallow network
     final_layer = shallownn.graph(x)
 
     # Define loss function - softmax_cross_entropy
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=final_layer))
+    cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_, logits=final_layer))
     
     # Define the AdamOptimiser
     adam = tf.train.AdamOptimizer(learning_rate=0.00005, beta1=0.9, beta2=0.999, epsilon=1e-08, name="adam")
     train_step = adam.minimize(cross_entropy)
         
-        
-    # TODO calculate the prediction and the accuracy
-    correct_predictions = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
+    # count correct predictions and calculate the accuracy
+    correct_predictions = tf.equal(tf.argmax(final_layer, 1), y_)
     accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
     
     # summaries for TensorBoard visualisation
