@@ -8,7 +8,7 @@ import deepnn
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer('max_steps', 200, 'Number of mini-batches to train on. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('max_epochs', 200, 'Number of epochs to run. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
                             
 
@@ -28,37 +28,38 @@ xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
 def main(_):
     tf.reset_default_graph()
 
-    # Import data
+    # Import & pre-process data
     train_set, test_set = utils.load_music()
-    # TODO Pre-process?
+    train_set['mels'] = map(utils.melspectrogram, train_set['data'])
+    test_set['mels'] = map(utils.melspectrogram, test_set['data'])
+    print("Melspectrogramming done")
+    train_indices = np.arange(len(train_set['labels']))
 
-
+    
     with tf.variable_scope('inputs'):
         # Create the model
         x = tf.placeholder(tf.float32, [None, 80*80]) # output from melspectrogram
         y_ = tf.placeholder(tf.float32, [None, 10]) # ten types of music
 
-
-    # Build the graph for the deep net
+    # Build the graph for the shallow network
     final_layer = shallownn.graph(x)
 
     # Define loss function - softmax_cross_entropy
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=final_layer))
-    ## Define the AdamOptimiser
+    
+    # Define the AdamOptimiser
     adam = tf.train.AdamOptimizer(learning_rate=0.00005, beta1=0.9, beta2=0.999, epsilon=1e-08, name="adam")
     train_step = adam.minimize(cross_entropy)
         
         
-    # calculate the prediction and the accuracy
-    correct_predictions = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1)) # TODO calculate predictions with data
+    # TODO calculate the prediction and the accuracy
+    correct_predictions = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
     
+    # summaries for TensorBoard visualisation
     loss_summary = tf.summary.scalar('Loss', cross_entropy)
     acc_summary = tf.summary.scalar('Accuracy', accuracy)
-
-    
-    # summaries for TensorBoard visualisation
-    test_summary = tf.summary.merge([loss_summary, acc_summary])
+    la_summary = tf.summary.merge([loss_summary, acc_summary])
 
     # saver for checkpoints
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
@@ -70,46 +71,44 @@ def main(_):
         sess.run(tf.global_variables_initializer())
 
         # Training and validation
-        for step in range(FLAGS.max_steps):
-            # Training: Backpropagation using train set
-            (trainImages, trainLabels) = cifar.getTrainBatch()
-            (testImages, testLabels) = cifar.getTestBatch()
+        for epoch in range(FLAGS.max_epochs):
             
-            _, summary_str = sess.run([train_step, training_summary], feed_dict={x: trainImages, y_: trainLabels})
-
+            # shuffle data
+            np.random.shuffle(train_indices)
+            train_spectrograms = train_set['mels'][train_indices]
+            train_labels = train_set['labels'][train_indices]
             
-            if step % (FLAGS.log_frequency + 1)== 0:
-                summary_writer.add_summary(summary_str, step)
+            # training loop by batches
+            for i in range(0, len(train_labels), batch_size):
+                sess.run(train_step, feed_dict={
+                    x: train_spectrograms[i:i + batch_size],
+                    y_: train_labels[i:i + batch_size]})
+                
+            # validation
+            validation_accuracy, validation_summary_str = sess.run([accuracy, la_summary], feed_dict={
+                x: train_spectrograms[:batch_size],
+                y_: train_labels[:batch_size]})
 
-            # Validation: Monitoring accuracy using validation set
-            if step % FLAGS.log_frequency == 0:
-                validation_accuracy, summary_str = sess.run([accuracy, validation_summary], feed_dict={x: testImages, y_: testLabels})
-                print('step %d, accuracy on validation batch: %g' % (step, validation_accuracy))
-                summary_writer_validation.add_summary(summary_str, step)
-
-            # Save the model checkpoint periodically.
-            if step % FLAGS.save_model == 0 or (step + 1) == FLAGS.max_steps:
-                checkpoint_path = os.path.join(run_log_dir + '_train', 'model.ckpt')
-                saver.save(sess, checkpoint_path, global_step=step)
+            summary_writer.add_summary(validation_summary_str, epoch)
+            print('epoch %d, accuracy on validation batch: %g' % (epoch, validation_accuracy))
+                
 
         # Testing
 
-        # resetting the internal batch indexes
-        cifar.reset()
-        evaluated_images = 0
-        test_accuracy = 0
         batch_count = 0
+        test_accuracy = 0
 
-        # don't loop back when we reach the end of the test set
-        while evaluated_images != cifar.nTestSamples:
+        for i in range(0, len(test_set['labels']), batch_size):
+            
             (testImages, testLabels) = cifar.getTestBatch(allowSmallerBatches=True)
-            test_accuracy_temp, _ = sess.run([accuracy, test_summary], feed_dict={x: testImages, y_: testLabels})
+            test_accuracy_temp = sess.run(accuracy, feed_dict={
+                x: test_set['mels'],
+                y_: test_set['labels']})
 
             batch_count = batch_count + 1
             test_accuracy = test_accuracy + test_accuracy_temp
-            evaluated_images = evaluated_images + testLabels.shape[0]
-
         test_accuracy = test_accuracy / batch_count
+        
         print('test set: accuracy on test set: %0.3f' % test_accuracy)
 
 
