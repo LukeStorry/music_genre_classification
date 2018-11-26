@@ -1,7 +1,18 @@
-def graph(x_images):
+import tensorflow as tf
+
+
+xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
+
+def leaky_relu (x, alpha=0.3):
+    if x > 0:
+        return x
+    else:
+        return alpha * x
+
+def graph(inputs):
 
     left_conv = tf.layers.conv2d(
-        inputs=x_images,
+        inputs=inputs,
         filters=16,
         kernel_size=[10, 23],
         padding='same',
@@ -10,7 +21,7 @@ def graph(x_images):
         name='left_conv'
     )
     right_conv = tf.layers.conv2d(
-        inputs=x_images,
+        inputs=inputs,
         filters=16,
         kernel_size=[21, 20],
         padding='same',
@@ -19,8 +30,8 @@ def graph(x_images):
         name='right_conv'
     )
 
-    left_conv_relu = tf.nn.leaky_relu(left_conv, alpha=0.3)
-    right_conv_relu = tf.nn.leaky_relu(right_conv, alpha=0.3)
+    left_conv_relu = leaky_relu(left_conv, alpha=0.3)
+    right_conv_relu = leaky_relu(right_conv, alpha=0.3)
 
     left_pooling = tf.layers.max_pooling2d(
             inputs=left_conv_relu,

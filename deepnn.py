@@ -1,5 +1,13 @@
 import tensorflow as tf
 
+xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
+
+def leaky_relu (x, alpha=0.3):
+    if x > 0:
+        return x
+    else:
+        return alpha * x
+    
 def graph(x_images):
 
     #layer 1
@@ -22,8 +30,8 @@ def graph(x_images):
         name='right_conv'
     )
 
-    left_conv_1_relu = tf.nn.leaky_relu(left_conv_1, alpha=0.3)
-    right_conv_1_relu = tf.nn.leaky_relu(right_conv_1, alpha=0.3)
+    left_conv_1_relu = leaky_relu(left_conv_1, alpha=0.3)
+    right_conv_1_relu = leaky_relu(right_conv_1, alpha=0.3)
 
     left_pooling_1 = tf.layers.max_pooling2d(
             inputs=left_conv_1_relu,
@@ -59,8 +67,8 @@ def graph(x_images):
         name='right_conv_2'
     )
 
-    left_conv_2_relu = tf.nn.leaky_relu(left_conv_2, alpha=0.3)
-    right_conv_2_relu = tf.nn.leaky_relu(right_conv_2, alpha=0.3)
+    left_conv_2_relu = leaky_relu(left_conv_2, alpha=0.3)
+    right_conv_2_relu = leaky_relu(right_conv_2, alpha=0.3)
 
     left_pooling_2 = tf.layers.max_pooling2d(
             inputs=left_conv_2_relu,
@@ -96,8 +104,8 @@ def graph(x_images):
         name='right_conv_3'
     )
 
-    left_conv_3_relu = tf.nn.leaky_relu(left_conv_3, alpha=0.3)
-    right_conv_3_relu = tf.nn.leaky_relu(right_conv_3, alpha=0.3)
+    left_conv_3_relu = leaky_relu(left_conv_3, alpha=0.3)
+    right_conv_3_relu = leaky_relu(right_conv_3, alpha=0.3)
 
     left_pooling_3 = tf.layers.max_pooling2d(
             inputs=left_conv_3_relu,
@@ -133,8 +141,8 @@ def graph(x_images):
         name='right_conv_4'
     )
 
-    left_conv_4_relu = tf.nn.leaky_relu(left_conv_4, alpha=0.3)
-    right_conv_4_relu = tf.nn.leaky_relu(right_conv_4, alpha=0.3)
+    left_conv_4_relu = leaky_relu(left_conv_4, alpha=0.3)
+    right_conv_4_relu = leaky_relu(right_conv_4, alpha=0.3)
 
     #10x2x128 tensor
     left_pooling_4 = tf.layers.max_pooling2d(

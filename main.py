@@ -20,16 +20,12 @@ tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd()),'Dir
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_'.format())
 
 
-
-xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
-
-
 def main(_):
     tf.reset_default_graph()
 
-    # Import & pre-process data
+    # Import data
     train_set, test_set = utils.load_music()
-    train_indices = np.arange(len(train_set['labels']))
+    train_indices = range(len(train_set['labels']))
     
     
     with tf.variable_scope('inputs'):
@@ -37,8 +33,10 @@ def main(_):
         x = tf.placeholder(tf.float32, [None, 80*80]) # output from melspectrogram
         y_ = tf.placeholder(tf.float32, [None, 1]) # ten types of music
 
+    x_reshaped = tf.reshape(x, [-1, 80, 80]) # , 1 ?
+    
     # Build the graph for the shallow network
-    final_layer = shallownn.graph(x)
+    final_layer = shallownn.graph(x_reshaped)
 
     # Define loss function - softmax_cross_entropy
     cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_, logits=final_layer))
@@ -76,8 +74,8 @@ def main(_):
             # training loop by batches
             for i in range(0, len(train_labels), batch_size):
                 spectrograms = map(utils.melspectrogram, train_data[i:i + batch_size])
-                labels = train_labels[i:i + batch_size]]
-                sess.run(train_step, feed_dict={x: spectrograms,y_: labels]})
+                labels = train_labels[i:i + batch_size]
+                sess.run(train_step, feed_dict={x: spectrograms,y_: labels})
                 
             # validation
             validation_accuracy, validation_summary_str = sess.run([accuracy, la_summary], feed_dict={
