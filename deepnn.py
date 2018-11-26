@@ -116,7 +116,7 @@ def graph(x_images):
     #layer4
     left_conv_4 = tf.layers.conv2d(
         inputs=left_pooling_3,
-        filters=64,
+        filters=128,
         kernel_size=[2, 4],
         padding='same',
         use_bias=False,
@@ -125,7 +125,7 @@ def graph(x_images):
     )
     right_conv_4 = tf.layers.conv2d(
         inputs=right_pooling_3,
-        filters=64,
+        filters=128,
         kernel_size=[4, 2],
         padding='same',
         use_bias=False,

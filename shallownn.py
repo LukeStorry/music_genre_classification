@@ -1,5 +1,5 @@
 def graph(x_images):
-    
+
     left_conv = tf.layers.conv2d(
         inputs=x_images,
         filters=16,
@@ -18,24 +18,24 @@ def graph(x_images):
         kernel_initializer=xavier_initializer,
         name='right_conv'
     )
-    
+
     left_conv_relu = tf.nn.leaky_relu(left_conv, alpha=0.3)
     right_conv_relu = tf.nn.leaky_relu(right_conv, alpha=0.3)
 
     left_pooling = tf.layers.max_pooling2d(
-            inputs=left_conv_1_relu,
+            inputs=left_conv_relu,
             pool_size=[1, 20],
             strides=1,
             name='left_pooling'
     )
 
     right_pooling = tf.layers.max_pooling2d(
-            inputs=conv1_tc_lr,
+            inputs=right_conv_relu,
             pool_size=[20, 1],
             strides=1,
             name='right_pooling'
     )
-        
+
     left_flattened = tf.reshape(left_pooling, [-1, 5120])
     right_flattened = tf.reshape(right_pooling, [-1, 5120])
 
@@ -53,7 +53,7 @@ def graph(x_images):
         bias_initializer=xavier_initializer,
         name='fully_connected_layer'
     )
-    
+
     fully_connected_layer_2 = tf.layers.dense(
         inputs=fully_connected_layer,
         units=10,
