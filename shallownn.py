@@ -3,8 +3,6 @@ import librosa
 import pickle
 import utils
 
-train_set, test_set = utils.load_music()
-
 
 '''
 Hyperparameter flags taken from lab code.
@@ -21,8 +19,6 @@ tf.app.flags.DEFINE_integer('log_frequency', 10,
 
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer('batch_size', 256, 'Number of examples per mini-batch (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning_rate', 1e-5, 'Learning rate (default: %(default)d)')
-
 
 tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd()),'Directory where to write event logs and checkpoint. (default: %(default)s)')
 
@@ -77,8 +73,8 @@ def shallownn(x_images):
     dropout = tf.layers.dropout(merged, 0.1)
 
     fully_connected_layer = tf.layers.dense(
-        dropout,
-        200,
+        inputs=dropout,
+        units=200,
         activation=None,
         use_bias=True,
         trainable=True,
@@ -86,48 +82,55 @@ def shallownn(x_images):
         bias_initializer=xavier_initializer,
         name='fully_connected_layer'
     )
+    
+    fully_connected_layer_2 = tf.layers.dense(
+        inputs=fully_connected_layer,
+        units=10,
+        activation=None,
+        use_bias=True,
+        trainable=True,
+        kernel_initializer=xavier_initializer,
+        bias_initializer=xavier_initializer,
+        name='fully_connected_layer_2'
+    )
+    return fully_connected_layer_2
 
-
-
-
-#### BELOW IS FROM LAB CODE, NEEDS EDITING: ####
 
 
 def main(_):
     tf.reset_default_graph()
 
     # Import data
-    cifar = cf.cifar10(batchSize=FLAGS.batch_size, downloadDir=FLAGS.data_dir)
+    train_set, test_set = utils.load_music()
+    # TODO Pre-process?
+
 
     with tf.variable_scope('inputs'):
         # Create the model
-        x = tf.placeholder(tf.float32, [None, FLAGS.img_width * FLAGS.img_height * FLAGS.img_channels])
-        # Define loss and optimizer
-        y_ = tf.placeholder(tf.float32, [None, FLAGS.num_classes])
+        x = tf.placeholder(tf.float32, [None, 80*80]) # output from melspectrogram
+        y_ = tf.placeholder(tf.float32, [None, 10]) # ten types of music
+
 
     # Build the graph for the deep net
-    y_conv, img_summary = deepnn(x)
+    final_layer = shallownn(x)
 
-    # Define your loss function - softmax_cross_entropy
-    with tf.variable_scope('x_entropy'):
-        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
+    # Define loss function - softmax_cross_entropy
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=final_layer))
+    ## Define the AdamOptimiser
+    adam = tf.train.AdamOptimizer(learning_rate=0.00005, beta1=0.9, beta2=0.999, epsilon=1e-08, name="adam")
+    train_step = adam.minimize(cross_entropy)
+        
         
     # calculate the prediction and the accuracy
-    correct_predictions = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
+    correct_predictions = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1)) # TODO calculate predictions with data
     accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
     
     loss_summary = tf.summary.scalar('Loss', cross_entropy)
     acc_summary = tf.summary.scalar('Accuracy', accuracy)
 
-        
-    ## Define your AdamOptimiser, using FLAGS.learning_rate to minimixe the loss function
-    train_step = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate).minimize(cross_entropy)
-
     
     # summaries for TensorBoard visualisation
-    validation_summary = tf.summary.merge([img_summary, acc_summary])
-    training_summary = tf.summary.merge([img_summary, loss_summary])
-    test_summary = tf.summary.merge([img_summary, acc_summary])
+    test_summary = tf.summary.merge([loss_summary, acc_summary])
 
     # saver for checkpoints
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
