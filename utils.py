@@ -13,4 +13,5 @@ def load_music():
     with open('music_genres_dataset.pkl', 'rb') as f:
         train_set = pickle.load(f)
         test_set = pickle.load(f)
+    print("Music Data Loaded")
     return train_set, test_set

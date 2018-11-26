@@ -1,9 +1,8 @@
 import tensorflow as tf
-import librosa
-import pickle
 import utils
 import shallownn
 import deepnn
+import os
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -30,11 +29,8 @@ def main(_):
 
     # Import & pre-process data
     train_set, test_set = utils.load_music()
-    train_set['mels'] = map(utils.melspectrogram, train_set['data'])
-    test_set['mels'] = map(utils.melspectrogram, test_set['data'])
-    print("Melspectrogramming done")
     train_indices = np.arange(len(train_set['labels']))
-
+    
     
     with tf.variable_scope('inputs'):
         # Create the model
@@ -74,14 +70,14 @@ def main(_):
             
             # shuffle data
             np.random.shuffle(train_indices)
-            train_spectrograms = train_set['mels'][train_indices]
+            train_data = train_set['data'][train_indices]
             train_labels = train_set['labels'][train_indices]
             
             # training loop by batches
             for i in range(0, len(train_labels), batch_size):
-                sess.run(train_step, feed_dict={
-                    x: train_spectrograms[i:i + batch_size],
-                    y_: train_labels[i:i + batch_size]})
+                spectrograms = map(utils.melspectrogram, train_data[i:i + batch_size])
+                labels = train_labels[i:i + batch_size]]
+                sess.run(train_step, feed_dict={x: spectrograms,y_: labels]})
                 
             # validation
             validation_accuracy, validation_summary_str = sess.run([accuracy, la_summary], feed_dict={
@@ -98,11 +94,10 @@ def main(_):
         test_accuracy = 0
 
         for i in range(0, len(test_set['labels']), batch_size):
-            
-            (testImages, testLabels) = cifar.getTestBatch(allowSmallerBatches=True)
-            test_accuracy_temp = sess.run(accuracy, feed_dict={
-                x: test_set['mels'],
-                y_: test_set['labels']})
+            test_spectrograms = map(utils.melspectrogram, test_set['data'][i:i + batch_size])
+            testLabels = test_set['labels'][i:i + batch_size]
+
+            test_accuracy_temp = sess.run(accuracy, feed_dict={x: test_spectrograms, y_: testLabels})
 
             batch_count = batch_count + 1
             test_accuracy = test_accuracy + test_accuracy_temp
