@@ -36,55 +36,60 @@ tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd()),'Dir
 xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
 
 def shallownn(x_images):
-    conv1_cf = tf.layers.conv2d(
+    
+    left_conv = tf.layers.conv2d(
         inputs=x_images,
         filters=16,
         kernel_size=[10, 23],
         padding='same',
         use_bias=False,
         kernel_initializer=xavier_initializer,
-        name='conv1_cf'
+        name='left_conv'
     )
-    conv1_cf_lr = tf.nn.leaky_relu(conv1_cf, alpha=0.3)
-    pool1_cf = tf.layers.max_pooling2d(
-            inputs=conv1_cf_lr,
-            pool_size=[1, 20],
-            strides=1,
-            name='pool1_cf'
-        )
-
-    flat_pool_cf = tf.reshape(pool1, [-1, 5120])
-
-    conv1_tc = tf.layers.conv2d(
+    right_conv = tf.layers.conv2d(
         inputs=x_images,
         filters=16,
         kernel_size=[21, 20],
         padding='same',
         use_bias=False,
         kernel_initializer=xavier_initializer,
-        name='conv1_tc'
+        name='right_conv'
     )
-    conv1_tc_lr = tf.nn.leaky_relu(conv1_tc, alpha=0.3)
-    pool1_tc = tf.layers.max_pooling2d(
+    
+    left_conv_relu = tf.nn.leaky_relu(left_conv, alpha=0.3)
+    right_conv_relu = tf.nn.leaky_relu(right_conv, alpha=0.3)
+
+    left_pooling = tf.layers.max_pooling2d(
+            inputs=left_conv_1_relu,
+            pool_size=[1, 20],
+            strides=1,
+            name='left_pooling'
+    )
+
+    right_pooling = tf.layers.max_pooling2d(
             inputs=conv1_tc_lr,
             pool_size=[20, 1],
             strides=1,
-            name='pool1_tc'
-        )
+            name='right_pooling'
+    )
+        
+    left_flattened = tf.reshape(left_pooling, [-1, 5120])
+    right_flattened = tf.reshape(right_pooling, [-1, 5120])
 
-    flat_pool_tc = tf.reshape(pool1, [-1, 5120])
+    merged = tf.concat(left_flattened, right_flattened, 1)
 
-    flat_pool_concat = tf.concat(pool1_cf, pool1_tc, 1)
+    dropout = tf.layers.dropout(merged, 0.1)
 
-    dropout = tf.layers.dropout(flat_pool_concat, 0.1)
-
-    fc1 = tf.layers.dense(
-        flat_pool_concat,
+    fully_connected_layer = tf.layers.dense(
+        dropout,
         200,
         activation=None,
         use_bias=True,
         trainable=True,
         kernel_initializer=xavier_initializer,
         bias_initializer=xavier_initializer,
-        name='fc1'
+        name='fully_connected_layer'
     )
+
+
+# todo softmax
