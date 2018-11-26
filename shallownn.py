@@ -3,48 +3,46 @@ import tensorflow as tf
 
 xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
 
-def leaky_relu (x, alpha=0.3):
-    if x > 0:
-        return x
-    else:
-        return alpha * x
 
-def graph(inputs):
+def leaky_relu(x, alpha=0.3):
+    return tf.maximum(x, alpha * x)
+
+
+def graph(x):
 
     left_conv = tf.layers.conv2d(
-        inputs=inputs,
+        inputs=x,
         filters=16,
         kernel_size=[10, 23],
         padding='same',
+        activation=leaky_relu,
         use_bias=False,
         kernel_initializer=xavier_initializer,
         name='left_conv'
     )
     right_conv = tf.layers.conv2d(
-        inputs=inputs,
+        inputs=x,
         filters=16,
         kernel_size=[21, 20],
         padding='same',
+        activation=leaky_relu,
         use_bias=False,
         kernel_initializer=xavier_initializer,
         name='right_conv'
     )
 
-    left_conv_relu = leaky_relu(left_conv, alpha=0.3)
-    right_conv_relu = leaky_relu(right_conv, alpha=0.3)
-
     left_pooling = tf.layers.max_pooling2d(
-            inputs=left_conv_relu,
-            pool_size=[1, 20],
-            strides=1,
-            name='left_pooling'
+        inputs=left_conv,
+        pool_size=[1, 20],
+        strides=2,
+        name='left_pooling'
     )
 
     right_pooling = tf.layers.max_pooling2d(
-            inputs=right_conv_relu,
-            pool_size=[20, 1],
-            strides=1,
-            name='right_pooling'
+        inputs=right_conv,
+        strides=2,
+        pool_size=[20, 1],
+        name='right_pooling'
     )
 
     left_flattened = tf.reshape(left_pooling, [-1, 5120])
@@ -52,7 +50,8 @@ def graph(inputs):
 
     merged = tf.concat(left_flattened, right_flattened, 1)
 
-    dropout = tf.layers.dropout(merged, 0.1)
+    # TODO dropout() needs training bool hyperparameters
+    dropout = tf.layers.dropout(merged, 0.1, name='dropout')
 
     fully_connected_layer = tf.layers.dense(
         inputs=dropout,
