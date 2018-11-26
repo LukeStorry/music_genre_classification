@@ -48,7 +48,7 @@ def graph(x):
     left_flattened = tf.reshape(left_pooling, [-1, 5120])
     right_flattened = tf.reshape(right_pooling, [-1, 5120])
 
-    merged = tf.concat(left_flattened, right_flattened, 1)
+    merged = tf.concat([left_flattened, right_flattened], 1)
 
     # TODO dropout() needs training bool hyperparameters
     dropout = tf.layers.dropout(merged, 0.1, name='dropout')
