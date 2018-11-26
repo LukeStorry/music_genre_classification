@@ -13,24 +13,20 @@ Hyperparameter flags taken from lab code.
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('data_dir', os.getcwd() + '/dataset/',
-                            'Directory where the dataset will be stored and checkpoint. (default: %(default)s)')
-tf.app.flags.DEFINE_integer('max_steps', 10000,
+tf.app.flags.DEFINE_integer('max_steps', 200,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('log_frequency', 10,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
-tf.app.flags.DEFINE_integer('save_model', 1000,
-                            'Number of steps between model saves (default: %(default)d)')
+                            
 
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer('batch_size', 256, 'Number of examples per mini-batch (default: %(default)d)')
 tf.app.flags.DEFINE_float('learning_rate', 1e-5, 'Learning rate (default: %(default)d)')
-tf.app.flags.DEFINE_integer('img_width', 32, 'Image width (default: %(default)d)')
-tf.app.flags.DEFINE_integer('img_height', 32, 'Image height (default: %(default)d)')
-tf.app.flags.DEFINE_integer('img_channels', 3, 'Image channels (default: %(default)d)')
-tf.app.flags.DEFINE_integer('num_classes', 10, 'Number of classes (default: %(default)d)')
+
+
 tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd()),'Directory where to write event logs and checkpoint. (default: %(default)s)')
 
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_BN_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate))
 
 
 xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
@@ -92,4 +88,100 @@ def shallownn(x_images):
     )
 
 
-# todo softmax
+
+
+#### BELOW IS FROM LAB CODE, NEEDS EDITING: ####
+
+
+def main(_):
+    tf.reset_default_graph()
+
+    # Import data
+    cifar = cf.cifar10(batchSize=FLAGS.batch_size, downloadDir=FLAGS.data_dir)
+
+    with tf.variable_scope('inputs'):
+        # Create the model
+        x = tf.placeholder(tf.float32, [None, FLAGS.img_width * FLAGS.img_height * FLAGS.img_channels])
+        # Define loss and optimizer
+        y_ = tf.placeholder(tf.float32, [None, FLAGS.num_classes])
+
+    # Build the graph for the deep net
+    y_conv, img_summary = deepnn(x)
+
+    # Define your loss function - softmax_cross_entropy
+    with tf.variable_scope('x_entropy'):
+        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
+        
+    # calculate the prediction and the accuracy
+    correct_predictions = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+    
+    loss_summary = tf.summary.scalar('Loss', cross_entropy)
+    acc_summary = tf.summary.scalar('Accuracy', accuracy)
+
+        
+    ## Define your AdamOptimiser, using FLAGS.learning_rate to minimixe the loss function
+    train_step = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate).minimize(cross_entropy)
+
+    
+    # summaries for TensorBoard visualisation
+    validation_summary = tf.summary.merge([img_summary, acc_summary])
+    training_summary = tf.summary.merge([img_summary, loss_summary])
+    test_summary = tf.summary.merge([img_summary, acc_summary])
+
+    # saver for checkpoints
+    saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+
+    with tf.Session() as sess:
+        summary_writer = tf.summary.FileWriter(run_log_dir + '_train', sess.graph)
+        summary_writer_validation = tf.summary.FileWriter(run_log_dir + '_validate', sess.graph)
+
+        sess.run(tf.global_variables_initializer())
+
+        # Training and validation
+        for step in range(FLAGS.max_steps):
+            # Training: Backpropagation using train set
+            (trainImages, trainLabels) = cifar.getTrainBatch()
+            (testImages, testLabels) = cifar.getTestBatch()
+            
+            _, summary_str = sess.run([train_step, training_summary], feed_dict={x: trainImages, y_: trainLabels})
+
+            
+            if step % (FLAGS.log_frequency + 1)== 0:
+                summary_writer.add_summary(summary_str, step)
+
+            # Validation: Monitoring accuracy using validation set
+            if step % FLAGS.log_frequency == 0:
+                validation_accuracy, summary_str = sess.run([accuracy, validation_summary], feed_dict={x: testImages, y_: testLabels})
+                print('step %d, accuracy on validation batch: %g' % (step, validation_accuracy))
+                summary_writer_validation.add_summary(summary_str, step)
+
+            # Save the model checkpoint periodically.
+            if step % FLAGS.save_model == 0 or (step + 1) == FLAGS.max_steps:
+                checkpoint_path = os.path.join(run_log_dir + '_train', 'model.ckpt')
+                saver.save(sess, checkpoint_path, global_step=step)
+
+        # Testing
+
+        # resetting the internal batch indexes
+        cifar.reset()
+        evaluated_images = 0
+        test_accuracy = 0
+        batch_count = 0
+
+        # don't loop back when we reach the end of the test set
+        while evaluated_images != cifar.nTestSamples:
+            (testImages, testLabels) = cifar.getTestBatch(allowSmallerBatches=True)
+            test_accuracy_temp, _ = sess.run([accuracy, test_summary], feed_dict={x: testImages, y_: testLabels})
+
+            batch_count = batch_count + 1
+            test_accuracy = test_accuracy + test_accuracy_temp
+            evaluated_images = evaluated_images + testLabels.shape[0]
+
+        test_accuracy = test_accuracy / batch_count
+        print('test set: accuracy on test set: %0.3f' % test_accuracy)
+
+
+
+if __name__ == '__main__':
+    tf.app.run(main=main)
