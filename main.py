@@ -72,9 +72,7 @@ def main(_):
 
     # Import data
     train_set, test_set = utils.load_music()
-    train_spectrograms = np.array(map(utils.melspectrogram, train_set['data']))
-    print "Spectrograms all done"
-    
+
     with tf.Session() as sess:
         summary_writer = tf.summary.FileWriter(run_log_dir + '_train', sess.graph)
         summary_writer_validation = tf.summary.FileWriter(run_log_dir + '_validate', sess.graph)
@@ -83,7 +81,7 @@ def main(_):
 
         # Set up training lists to be selectable by shuffled list of indices
         train_labels = np.array(train_set['labels'])
-        # train_data = np.array(train_set['data'])
+        train_data = np.array(train_set['data'])
         train_indices = range(len(train_set['data']))
         validation_indices = range(len(train_set['data']))
         np.random.shuffle(validation_indices)  # only shuffle validation once
@@ -95,7 +93,8 @@ def main(_):
             # Training loop by batches
             for i in range(0, len(train_labels), FLAGS.batch_size):
                 train_batch_labels = train_labels[train_indices][i:i + FLAGS.batch_size]
-                train_batch_spectrograms = train_spectrograms[train_indices][i:i + FLAGS.batch_size]
+                train_batch_spectrograms = map(utils.melspectrogram,
+                                               train_data[train_indices][i:i + FLAGS.batch_size])
 
                 sess.run(train_step, feed_dict={training: True,
                                                 x: train_batch_spectrograms,
@@ -103,7 +102,8 @@ def main(_):
 
             # Validation with same pre-made selection of train set
             v_batch_labels = train_labels[validation_indices][:FLAGS.batch_size]
-            v_batch_spectrograms = train_spectrograms[validation_indices][:FLAGS.batch_size]
+            v_batch_spectrograms = map(utils.melspectrogram,
+                                       train_data[validation_indices][:FLAGS.batch_size])
             val_accuracy, val_summary_str = sess.run([accuracy, la_summary],
                                                      feed_dict={training: False,
                                                                 x:  v_batch_spectrograms,
