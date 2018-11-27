@@ -1,4 +1,5 @@
 import os
+import time
 import tensorflow as tf
 import numpy as np
 
@@ -6,11 +7,12 @@ import utils
 import shallownn
 import deepnn
 
-
 FLAGS = tf.app.flags.FLAGS
 
+tf.app.flags.DEFINE_string(
+    'depth', 'shallow', 'Whether to run the "deep" or "shallow" network. (default: %(default)s)')
 tf.app.flags.DEFINE_integer(
-    'max_epochs', 200, 'Number of epochs to run. (default: %(default)d)')
+    'epochs', 10, 'Number of epochs to run. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 
@@ -23,7 +25,8 @@ tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd(
 
 # TODO add flags for architecture and accuracy types
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_'.format())
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_{}_{}_{}'.format(
+    FLAGS.depth, FLAGS.epochs, int(time.time())))
 
 
 def main(_):
@@ -38,7 +41,13 @@ def main(_):
 
     # Build the graph for the shallow network
     with tf.variable_scope('model'):
-        final_layer = shallownn.graph(x_reshaped, training)
+        if FLAGS.depth == 'shallow':
+            final_layer = shallownn.graph(x_reshaped, training)
+        elif FLAGS.depth == 'deep':
+            final_layer = deepnn.graph(x_reshaped, training)
+        else:
+            print "Unknown depth flag:", FLAGS.depth
+            return
 
     # Define loss function - softmax_cross_entropy
     cross_entropy = tf.reduce_mean(
@@ -78,14 +87,14 @@ def main(_):
         np.random.shuffle(validation_indices)  # only shuffle validation once
 
         # Training & Validation by epoch
-        for epoch in range(FLAGS.max_epochs):
+        for epoch in range(FLAGS.epochs):
             np.random.shuffle(train_indices)  # shuffle training every epoch
 
             # Training loop by batches
             for i in range(0, len(train_labels), FLAGS.batch_size):
                 train_batch_labels = train_labels[train_indices][i:i + FLAGS.batch_size]
-                train_batch_data = train_data[train_indices][i:i + FLAGS.batch_size]
-                train_batch_spectrograms = map(utils.melspectrogram, train_batch_data)
+                train_batch_spectrograms = map(utils.melspectrogram,
+                                               train_data[train_indices][i:i + FLAGS.batch_size])
 
                 sess.run(train_step, feed_dict={training: True,
                                                 x: train_batch_spectrograms,
@@ -93,8 +102,8 @@ def main(_):
 
             # Validation with same pre-made selection of train set
             v_batch_labels = train_labels[validation_indices][:FLAGS.batch_size]
-            v_batch_data = train_data[v_batch_indices][:FLAGS.batch_size]
-            v_batch_spectrograms = map(utils.melspectrogram, v_batch_data)
+            v_batch_spectrograms = map(utils.melspectrogram,
+                                       train_data[validation_indices][:FLAGS.batch_size])
             val_accuracy, val_summary_str = sess.run([accuracy, la_summary],
                                                      feed_dict={training: False,
                                                                 x:  v_batch_spectrograms,
@@ -107,8 +116,8 @@ def main(_):
         test_accuracy = 0
         for i in range(0, len(test_set['labels']), FLAGS.batch_size):
             test_batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
-            test_batch_data = test_set['data'][i:i + FLAGS.batch_size]
-            test_batch_spectrograms = map(utils.melspectrogram, test_batch_data)
+            test_batch_spectrograms = map(utils.melspectrogram,
+                                          test_set['data'][i:i + FLAGS.batch_size])
             test_batch_accuracy = sess.run(accuracy, feed_dict={training: False,
                                                                 x: test_batch_spectrograms,
                                                                 y: test_batch_labels})
@@ -121,4 +130,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-    tf.app.run(main=main)
+    tf.app.run()
