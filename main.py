@@ -29,12 +29,14 @@ run_log_dir = os.path.join(FLAGS.log_dir, 'exp_{}_{}_{}'.format(
 
 def main(_):
     tf.reset_default_graph()
-
     # Create the model
     with tf.variable_scope('inputs'):
         training = tf.placeholder(tf.bool)
-        spectrograms = tf.reshape(tf.placeholder(tf.float32, [None, 80, 80]), [-1, 80, 80, 1])
-        labels = tf.placeholder(tf.int64, [None, ])  # ten types of music
+        audio = tf.placeholder(tf.float32, [None, 20462])
+        spectrograms = tf.map_fn(lambda a: tf.py_func(utils.melspectrogram, [a], [tf.float32] * 80 * 80),
+                                 audio, dtype=[tf.float32] * 80 * 80)
+        spectrograms = tf.reshape(spectrograms, [-1, 80, 80, 1])
+        labels = tf.placeholder(tf.int64, [None, ])
 
     # Build the graph for the shallow network
     with tf.variable_scope('model'):
@@ -89,20 +91,14 @@ def main(_):
 
             # Training loop by batches
             for i in range(0, len(train_labels), FLAGS.batch_size):
-                train_batch_spectrograms = map(utils.melspectrogram,
-                                                  train_data[train_indices][i:i + FLAGS.batch_size])
-                train_batch_labels = train_labels[train_indices][i:i + FLAGS.batch_size]
                 sess.run(train_step, feed_dict={training: True,
-                                                spectrograms: train_batch_spectrograms,
-                                                labels: train_batch_labels})
+                                                audio: train_data[train_indices][i:i + FLAGS.batch_size],
+                                                labels: train_labels[train_indices][i:i + FLAGS.batch_size]})
 
             # Validation with same pre-made selection of train set
-            v_batch_spectrograms = map(utils.melspectrogram,
-                                          train_data[validation_indices])
-            v_batch_labels = train_labels[validation_indices]
             val_accuracy, val_summary = sess.run([accuracy, la_summary], feed_dict={
                                                  training: False,
-                                                 spectrograms: train_data[validation_indices],
+                                                 audio: train_data[validation_indices],
                                                  labels: train_labels[validation_indices]})
 
             print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
@@ -112,12 +108,9 @@ def main(_):
         batch_count = 0
         test_accuracy = 0
         for i in range(0, len(test_set['labels']), FLAGS.batch_size):
-            test_batch_spectrograms = map(utils.melspectrogram,
-                                             test_set['data'][i:i + FLAGS.batch_size])
-            test_batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
             test_batch_accuracy = sess.run(accuracy, feed_dict={training: False,
-                                                                spectrograms: test_batch_spectrograms,
-                                                                labels: test_batch_labels})
+                                                                audio: test_set['data'][i:i + FLAGS.batch_size],
+                                                                labels: test_set['labels'][i:i + FLAGS.batch_size]})
             batch_count += 1
             test_accuracy += test_batch_accuracy
 
