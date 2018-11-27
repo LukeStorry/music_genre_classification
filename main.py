@@ -31,17 +31,18 @@ def main(_):
 
     # Create the model
     with tf.variable_scope('inputs'):
+        training = tf.placeholder(tf.bool)
         x = tf.placeholder(tf.float32, [None, 80, 80])
         x_reshaped = tf.reshape(x, [-1, 80, 80, 1])
-        y_ = tf.placeholder(tf.int64, [None, ])  # ten types of music
+        y = tf.placeholder(tf.int64, [None, ])  # ten types of music
 
     # Build the graph for the shallow network
     with tf.variable_scope('model'):
-        final_layer = shallownn.graph(x_reshaped)
+        final_layer = shallownn.graph(x_reshaped, training)
 
     # Define loss function - softmax_cross_entropy
     cross_entropy = tf.reduce_mean(
-        tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_, logits=final_layer))
+        tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=final_layer))
 
     # Define the AdamOptimiser
     adam = tf.train.AdamOptimizer(
@@ -49,7 +50,7 @@ def main(_):
     train_step = adam.minimize(cross_entropy)
 
     # count correct predictions and calculate the accuracy
-    correct_predictions = tf.equal(tf.argmax(final_layer, 1), y_)
+    correct_predictions = tf.equal(tf.argmax(final_layer, 1), y)
     accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
 
     # summaries for TensorBoard visualisation
@@ -62,9 +63,11 @@ def main(_):
 
     # Import data
     train_set, test_set = utils.load_music()
+    shuffled_indices = range(len(train_set['labels']))
 
     with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter(run_log_dir + '_train', sess.graph)
+        summary_writer = tf.summary.FileWriter(
+            run_log_dir + '_train', sess.graph)
         summary_writer_validation = tf.summary.FileWriter(
             run_log_dir + '_validate', sess.graph)
 
@@ -72,30 +75,32 @@ def main(_):
 
         # Training and validation
         for epoch in range(FLAGS.max_epochs):
-            shuffled_indices = range(len(train_set['labels']))
             np.random.shuffle(shuffled_indices)
             train_labels = np.array(train_set['labels'])[shuffled_indices]
             train_data = np.array(train_set['data'])[shuffled_indices]
 
             # training loop by batches
             for i in range(0, len(train_labels), FLAGS.batch_size):
-                spectrograms = map(utils.melspectrogram, train_data[i:i + FLAGS.batch_size])
-                # flattened = map(lambda x: x.flatten().tolist(), spectrograms)
-                labels = train_labels[i:i + FLAGS.batch_size]
-                sess.run(train_step, feed_dict={x: spectrograms, y_: labels})
-                print i,
-            print
+                train_batch_labels = train_labels[i:i + FLAGS.batch_size]
+                train_batch_spectrograms = map(utils.melspectrogram,
+                                               train_data[i:i + FLAGS.batch_size])
 
+                sess.run(train_step, feed_dict={training: True,
+                                                x: train_batch_spectrograms,
+                                                y: train_batch_labels})
             # validation
-            vaildation_spectrograms = map(utils.melspectrogram, train_data[:FLAGS.batch_size])
-            validation_accuracy, validation_summary_str = sess.run([accuracy, la_summary], feed_dict={
-                # x:  map(lambda x: x.flatten().tolist(), vaildation_spectrograms),
-                x:  vaildation_spectrograms,
-                y_: train_labels[:FLAGS.batch_size]})
+            np.random.shuffle(shuffled_indices)
+            validation_spectrograms = map(utils.melspectrogram,
+                                          train_data[:FLAGS.batch_size])
+            validation_accuracy, validation_summary_str = sess.run(
+                [accuracy, la_summary], feed_dict={
+                    training: False,
+                    x:  validation_spectrograms,
+                    y: train_labels[:FLAGS.batch_size]})
 
-            summary_writer.add_summary(validation_summary_str, epoch)
             print('epoch %d, accuracy on validation batch: %g' %
-                  (epoch, validation_accuracy))
+            (epoch, validation_accuracy))
+            summary_writer.add_summary(validation_summary_str, epoch)
 
         # Testing
 
@@ -103,16 +108,18 @@ def main(_):
         test_accuracy = 0
 
         for i in range(0, len(test_set['labels']), FLAGS.batch_size):
-            test_spectrograms = map(
-                utils.melspectrogram, test_set['data'][i:i + FLAGS.batch_size])
-            test_labels = test_set['labels'][i:i + FLAGS.batch_size]
+            test_batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
+            test_batch_data = test_set['data'][i:i + FLAGS.batch_size]
+            test_batch_spectrograms = map(
+                utils.melspectrogram, test_batch_data)
 
-            test_accuracy_temp = sess.run(
-                accuracy, feed_dict={x: test_spectrograms, y_: testLabels})
+            test_batch_accuracy = sess.run(accuracy, feed_dict={
+                training: False, x: test_batch_spectrograms, y: test_batch_labels})
 
-            batch_count = batch_count + 1
-            test_accuracy = test_accuracy + test_accuracy_temp
-        test_accuracy = test_accuracy / batch_count
+            batch_count += 1
+            test_accuracy += test_batch_accuracy
+
+        test_accuracy /= batch_count
 
         print('test set: accuracy on test set: %0.3f' % test_accuracy)
 

@@ -8,7 +8,7 @@ def leaky_relu(x, alpha=0.3):
     return tf.maximum(x, alpha * x)
 
 
-def graph(x):
+def graph(x, is_training):
 
     left_conv = tf.layers.conv2d(
         inputs=x,
@@ -16,7 +16,7 @@ def graph(x):
         kernel_size=[10, 23],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=False, # TODO is this not meant to be True?
         kernel_initializer=xavier_initializer,
         name='left_conv'
     )
@@ -33,7 +33,7 @@ def graph(x):
         kernel_size=[21, 20],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=False, # TODO is this not meant to be True?
         kernel_initializer=xavier_initializer,
         name='right_conv'
     )
@@ -49,8 +49,7 @@ def graph(x):
 
     merged = tf.concat([left_flattened, right_flattened], 1)
 
-    # TODO dropout() needs a 'training=' bool parameter
-    dropout = tf.layers.dropout(merged, 0.1, name='dropout')
+    dropout = tf.layers.dropout(merged, 0.1, training=is_training, name='dropout')
 
     fully_connected_layer = tf.layers.dense(
         inputs=dropout,
