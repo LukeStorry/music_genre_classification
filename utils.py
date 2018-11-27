@@ -8,7 +8,7 @@ def melspectrogram(audio):
                         hop_length=256, win_length=512, pad_mode='constant')
     mel_basis = librosa.filters.mel(sr=22050, n_fft=512, n_mels=80)
     mel_spec = np.dot(mel_basis, np.abs(spec))
-    return np.log(mel_spec + 1e-6).flatten().astype(np.float32, copy=False).tolist()
+    return np.log(mel_spec + 1e-6)
 
 
 def load_music():

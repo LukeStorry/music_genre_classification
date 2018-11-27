@@ -20,13 +20,6 @@ def graph(x, is_training):
         kernel_initializer=xavier_initializer,
         name='left_conv'
     )
-    left_pooling = tf.layers.max_pooling2d(
-        inputs=left_conv,
-        pool_size=[1, 20],
-        strides=[1, 20],
-        name='left_pooling'
-    )
-
     right_conv = tf.layers.conv2d(
         inputs=x,
         filters=16,
@@ -37,6 +30,12 @@ def graph(x, is_training):
         kernel_initializer=xavier_initializer,
         name='right_conv'
     )
+    left_pooling = tf.layers.max_pooling2d(
+        inputs=left_conv,
+        pool_size=[1, 20],
+        strides=[1, 20],  # is this meant to match pool_size?
+        name='left_pooling'
+    )
     right_pooling = tf.layers.max_pooling2d(
         inputs=right_conv,
         strides=[20, 1],
@@ -44,8 +43,8 @@ def graph(x, is_training):
         name='right_pooling'
     )
 
-    left_flattened = tf.reshape(left_pooling, [-1, 5120])
-    right_flattened = tf.reshape(right_pooling, [-1, 5120])
+    left_flattened = tf.reshape(left_pooling, [1, 5120])
+    right_flattened = tf.reshape(right_pooling, [1, 5120])
 
     merged = tf.concat([left_flattened, right_flattened], 1)
 
@@ -62,7 +61,7 @@ def graph(x, is_training):
         name='fully_connected_layer'
     )
 
-    fully_connected_layer_2 = tf.layers.dense(
+    final_layer = tf.layers.dense(
         inputs=fully_connected_layer,
         units=10,
         activation=None,
@@ -70,6 +69,6 @@ def graph(x, is_training):
         trainable=True,
         kernel_initializer=xavier_initializer,
         bias_initializer=xavier_initializer,
-        name='fully_connected_layer_2'
+        name='final_layer'
     )
-    return fully_connected_layer_2
+    return final_layer
