@@ -33,36 +33,34 @@ def main(_):
     # Create the model
     with tf.variable_scope('inputs'):
         training = tf.placeholder(tf.bool)
-        x = tf.placeholder(tf.float32, [None, 80, 80])
-        x_reshaped = tf.reshape(x, [-1, 80, 80, 1])
-        y = tf.placeholder(tf.int64, [None, ])  # ten types of music
+        spectrograms = tf.reshape(tf.placeholder(tf.float32, [None, 80, 80]), [-1, 80, 80, 1])
+        labels = tf.placeholder(tf.int64, [None, ])  # ten types of music
 
     # Build the graph for the shallow network
     with tf.variable_scope('model'):
         if FLAGS.depth == 'shallow':
-            final_layer = shallownn.graph(x_reshaped, training)
+            logits = shallownn.graph(spectrograms, training)
         elif FLAGS.depth == 'deep':
-            final_layer = deepnn.graph(x_reshaped, training)
+            logits = deepnn.graph(spectrograms, training)
         else:
             print "Unknown depth flag:", FLAGS.depth
-            return
+            return -1
 
-    # Define loss function - softmax_cross_entropy
+    # Define loss function, optimiser and training step
     cross_entropy = tf.reduce_mean(
-        tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=final_layer))
-
-    # Define the AdamOptimiser
+        tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits))
     adam = tf.train.AdamOptimizer(learning_rate=0.00005, beta1=0.9,
                                   beta2=0.999, epsilon=1e-08, name="adam")
     train_step = adam.minimize(cross_entropy)
 
     # count correct predictions and calculate the accuracy
-    correct_predictions = tf.equal(tf.argmax(final_layer, 1), y)
-    accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+    correct_predictions = tf.equal(tf.argmax(logits, 1), labels)
+    raw_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+    # TODO add the other accuracy metrics
 
     # summaries for TensorBoard visualisation
     loss_summary = tf.summary.scalar('Loss', cross_entropy)
-    acc_summary = tf.summary.scalar('Accuracy', accuracy)
+    acc_summary = tf.summary.scalar('Raw Accuracy', raw_accuracy)
     la_summary = tf.summary.merge([loss_summary, acc_summary])
 
     # saver for checkpoints
@@ -81,8 +79,9 @@ def main(_):
         train_labels = np.array(train_set['labels'])
         train_data = np.array(train_set['data'])
         train_indices = range(len(train_set['data']))
-        validation_indices = range(len(train_set['data']))
-        np.random.shuffle(validation_indices)  # only shuffle validation once
+        # get shuffled list of indices for validation set
+        np.random.shuffle(train_indices)
+        validation_indices = train_indices[:FLAGS.batch_size]
 
         # Training & Validation by epoch
         for epoch in range(FLAGS.epochs):
@@ -90,35 +89,35 @@ def main(_):
 
             # Training loop by batches
             for i in range(0, len(train_labels), FLAGS.batch_size):
-                train_batch_labels = train_labels[train_indices][i:i + FLAGS.batch_size]
                 train_batch_spectrograms = map(utils.melspectrogram,
-                                               train_data[train_indices][i:i + FLAGS.batch_size])
-
+                                                  train_data[train_indices][i:i + FLAGS.batch_size])
+                train_batch_labels = train_labels[train_indices][i:i + FLAGS.batch_size]
                 sess.run(train_step, feed_dict={training: True,
-                                                x: train_batch_spectrograms,
-                                                y: train_batch_labels})
+                                                spectrograms: train_batch_spectrograms,
+                                                labels: train_batch_labels})
 
             # Validation with same pre-made selection of train set
-            v_batch_labels = train_labels[validation_indices][:FLAGS.batch_size]
             v_batch_spectrograms = map(utils.melspectrogram,
-                                       train_data[validation_indices][:FLAGS.batch_size])
-            val_accuracy, val_summary_str = sess.run([accuracy, la_summary],
-                                                     feed_dict={training: False,
-                                                                x:  v_batch_spectrograms,
-                                                                y: v_batch_labels})
+                                          train_data[validation_indices])
+            v_batch_labels = train_labels[validation_indices]
+            val_accuracy, val_summary = sess.run([accuracy, la_summary], feed_dict={
+                                                 training: False,
+                                                 spectrograms: train_data[validation_indices],
+                                                 labels: train_labels[validation_indices]})
+
             print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
-            summary_writer.add_summary(val_summary_str, epoch)
+            summary_writer.add_summary(val_summary, epoch)
 
         # Testing
         batch_count = 0
         test_accuracy = 0
         for i in range(0, len(test_set['labels']), FLAGS.batch_size):
-            test_batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
             test_batch_spectrograms = map(utils.melspectrogram,
-                                          test_set['data'][i:i + FLAGS.batch_size])
+                                             test_set['data'][i:i + FLAGS.batch_size])
+            test_batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
             test_batch_accuracy = sess.run(accuracy, feed_dict={training: False,
-                                                                x: test_batch_spectrograms,
-                                                                y: test_batch_labels})
+                                                                spectrograms: test_batch_spectrograms,
+                                                                labels: test_batch_labels})
             batch_count += 1
             test_accuracy += test_batch_accuracy
 
