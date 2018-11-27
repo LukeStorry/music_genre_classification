@@ -42,14 +42,16 @@ def test_melspectrogram_speeds():
 
     def f1():
             np.random.shuffle(train_indices)  # shuffle training every epoch
-            for i in range(0, 1000, 16):
+            for i in range(0, len(train_data), 16):
                 a = map(melspectrogram, train_data[train_indices][i:i + 16])
 
     def f2():
         np.random.shuffle(train_indices)  # shuffle training every epoch
         m = np.array(map(melspectrogram, train_data))
-        for i in range(0, 1000, 16):
+        for i in range(0, len(train_data), 16):
             a = m[train_indices][i:i + 16]
 
     print timeit.timeit(f1, number=1) # > 129s
     print timeit.timeit(f2, number=1) # > 132s
+
+test_melspectrogram_speeds()

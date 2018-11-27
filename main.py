@@ -12,7 +12,7 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string(
     'depth', 'shallow', 'Whether to run the "deep" or "shallow" network. (default: %(default)s)')
 tf.app.flags.DEFINE_integer(
-    'epochs', 10, 'Number of epochs to run. (default: %(default)d)')
+    'epochs', 100, 'Number of epochs to run. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 
@@ -22,8 +22,6 @@ tf.app.flags.DEFINE_integer(
     'batch_size', 16, 'Number of examples per mini-batch (default: %(default)d)')
 tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd(
 )), 'Directory where to write event logs and checkpoint. (default: %(default)s)')
-
-# TODO add flags for architecture and accuracy types
 
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_{}_{}_{}'.format(
     FLAGS.depth, FLAGS.epochs, int(time.time())))
