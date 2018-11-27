@@ -23,7 +23,7 @@ def graph(x):
     left_pooling = tf.layers.max_pooling2d(
         inputs=left_conv,
         pool_size=[1, 20],
-        strides=2,
+        strides=[1,20],
         name='left_pooling'
     )
 
@@ -39,7 +39,7 @@ def graph(x):
     )
     right_pooling = tf.layers.max_pooling2d(
         inputs=right_conv,
-        strides=2,
+        strides=[20,1],
         pool_size=[20, 1],
         name='right_pooling'
     )
@@ -55,7 +55,7 @@ def graph(x):
     fully_connected_layer = tf.layers.dense(
         inputs=dropout,
         units=200,
-        activation=None,
+        activation=leaky_relu,
         use_bias=True,
         trainable=True,
         kernel_initializer=xavier_initializer,
