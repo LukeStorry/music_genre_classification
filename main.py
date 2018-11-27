@@ -45,8 +45,8 @@ def main(_):
         tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=final_layer))
 
     # Define the AdamOptimiser
-    adam = tf.train.AdamOptimizer(
-        learning_rate=0.00005, beta1=0.9, beta2=0.999, epsilon=1e-08, name="adam")
+    adam = tf.train.AdamOptimizer(learning_rate=0.00005, beta1=0.9,
+                                  beta2=0.999, epsilon=1e-08, name="adam")
     train_step = adam.minimize(cross_entropy)
 
     # count correct predictions and calculate the accuracy
@@ -63,59 +63,55 @@ def main(_):
 
     # Import data
     train_set, test_set = utils.load_music()
-    shuffled_indices = range(len(train_set['labels']))
 
     with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter(
-            run_log_dir + '_train', sess.graph)
-        summary_writer_validation = tf.summary.FileWriter(
-            run_log_dir + '_validate', sess.graph)
+        summary_writer = tf.summary.FileWriter(run_log_dir + '_train', sess.graph)
+        summary_writer_validation = tf.summary.FileWriter(run_log_dir + '_validate', sess.graph)
 
         sess.run(tf.global_variables_initializer())
 
-        # Training and validation
-        for epoch in range(FLAGS.max_epochs):
-            np.random.shuffle(shuffled_indices)
-            train_labels = np.array(train_set['labels'])[shuffled_indices]
-            train_data = np.array(train_set['data'])[shuffled_indices]
+        # Set up training lists to be selectable by shuffled list of indices
+        train_labels = np.array(train_set['labels'])
+        train_data = np.array(train_set['data'])
+        train_indices = range(len(train_set['data']))
+        validation_indices = range(len(train_set['data']))
+        np.random.shuffle(validation_indices)  # only shuffle validation once
 
-            # training loop by batches
+        # Training & Validation by epoch
+        for epoch in range(FLAGS.max_epochs):
+            np.random.shuffle(train_indices)  # shuffle training every epoch
+
+            # Training loop by batches
             for i in range(0, len(train_labels), FLAGS.batch_size):
-                train_batch_labels = train_labels[i:i + FLAGS.batch_size]
-                train_batch_spectrograms = map(utils.melspectrogram,
-                                               train_data[i:i + FLAGS.batch_size])
+                train_batch_labels = train_labels[train_indices][i:i + FLAGS.batch_size]
+                train_batch_data = train_data[train_indices][i:i + FLAGS.batch_size]
+                train_batch_spectrograms = map(utils.melspectrogram, train_batch_data)
 
                 sess.run(train_step, feed_dict={training: True,
                                                 x: train_batch_spectrograms,
                                                 y: train_batch_labels})
-            # validation
-            np.random.shuffle(shuffled_indices)
-            validation_spectrograms = map(utils.melspectrogram,
-                                          train_data[:FLAGS.batch_size])
-            validation_accuracy, validation_summary_str = sess.run(
-                [accuracy, la_summary], feed_dict={
-                    training: False,
-                    x:  validation_spectrograms,
-                    y: train_labels[:FLAGS.batch_size]})
 
-            print('epoch %d, accuracy on validation batch: %g' %
-            (epoch, validation_accuracy))
-            summary_writer.add_summary(validation_summary_str, epoch)
+            # Validation with same pre-made selection of train set
+            v_batch_labels = train_labels[validation_indices][:FLAGS.batch_size]
+            v_batch_data = train_data[v_batch_indices][:FLAGS.batch_size]
+            v_batch_spectrograms = map(utils.melspectrogram, v_batch_data)
+            val_accuracy, val_summary_str = sess.run([accuracy, la_summary],
+                                                     feed_dict={training: False,
+                                                                x:  v_batch_spectrograms,
+                                                                y: v_batch_labels})
+            print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
+            summary_writer.add_summary(val_summary_str, epoch)
 
         # Testing
-
         batch_count = 0
         test_accuracy = 0
-
         for i in range(0, len(test_set['labels']), FLAGS.batch_size):
             test_batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
             test_batch_data = test_set['data'][i:i + FLAGS.batch_size]
-            test_batch_spectrograms = map(
-                utils.melspectrogram, test_batch_data)
-
-            test_batch_accuracy = sess.run(accuracy, feed_dict={
-                training: False, x: test_batch_spectrograms, y: test_batch_labels})
-
+            test_batch_spectrograms = map(utils.melspectrogram, test_batch_data)
+            test_batch_accuracy = sess.run(accuracy, feed_dict={training: False,
+                                                                x: test_batch_spectrograms,
+                                                                y: test_batch_labels})
             batch_count += 1
             test_accuracy += test_batch_accuracy
 
