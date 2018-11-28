@@ -14,6 +14,8 @@ tf.app.flags.DEFINE_string(
 tf.app.flags.DEFINE_integer(
     'epochs', 100, 'Number of epochs to run. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
+    'samples', 11250, 'How many training samples to use (default: %(default)d)')
+tf.app.flags.DEFINE_integer(
     'log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 
 
@@ -77,8 +79,8 @@ def main(_):
         sess.run(tf.global_variables_initializer())
 
         # Set up training lists to be selectable by shuffled list of indices
-        train_labels = np.array(train_set['labels'])
-        train_data = np.array(train_set['data'])
+        train_labels = np.array(train_set['labels'])[:FLAGS.samples]
+        train_data = np.array(train_set['data'])[:FLAGS.samples]
         train_indices = range(len(train_labels))
         # get shuffled list of indices for validation set
         np.random.shuffle(train_indices)
@@ -139,7 +141,6 @@ def main(_):
         for genre, probabilites, votes in zip(actual_track_genres, test_sum_probabilities, test_votes):
             correct_with_probs += 1.0 if np.argmax(probabilites) == genre else 0.0
             correct_with_votes += 1.0 if np.argmax(votes) == genre else 0.0
-
 
         print 'Raw Probability accuracy on test set: %0.3f' % (test_raw_accuracy / batch_count)
         print 'Maximum Probability accuracy on test set: %0.3f' % (correct_with_probs / n_tracks)
