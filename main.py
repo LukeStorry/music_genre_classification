@@ -56,9 +56,8 @@ def main(_):
     train_step = adam.minimize(cross_entropy)
 
     # count correct predictions and calculate the accuracy
-    correct_predictions = tf.equal(tf.argmax(logits, 1), labels)
-    raw_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
-    # TODO add the other accuracy metrics
+    votes = tf.argmax(logits, 1)
+    raw_accuracy = tf.reduce_mean(tf.cast(tf.equal(votes, labels), tf.float32))
 
     # summaries for TensorBoard visualisation
     loss_summary = tf.summary.scalar('Loss', cross_entropy)
@@ -80,7 +79,7 @@ def main(_):
         # Set up training lists to be selectable by shuffled list of indices
         train_labels = np.array(train_set['labels'])
         train_data = np.array(train_set['data'])
-        train_indices = range(len(train_set['data']))
+        train_indices = range(len(train_labels))
         # get shuffled list of indices for validation set
         np.random.shuffle(train_indices)
         validation_indices = train_indices[:FLAGS.batch_size]
@@ -92,7 +91,7 @@ def main(_):
             # Training loop by batches
             for i in range(0, len(train_labels), FLAGS.batch_size):
                 train_batch_spectrograms = map(utils.melspectrogram,
-                                                  train_data[train_indices][i:i + FLAGS.batch_size])
+                                               train_data[train_indices][i:i + FLAGS.batch_size])
                 train_batch_labels = train_labels[train_indices][i:i + FLAGS.batch_size]
                 sess.run(train_step, feed_dict={training: True,
                                                 spectrograms: train_batch_spectrograms,
@@ -100,7 +99,7 @@ def main(_):
 
             # Validation with same pre-made selection of train set
             v_batch_spectrograms = map(utils.melspectrogram,
-                                          train_data[validation_indices])
+                                       train_data[validation_indices])
             v_batch_labels = train_labels[validation_indices]
             val_accuracy, val_summary = sess.run([raw_accuracy, la_summary], feed_dict={
                                                  training: False,
@@ -111,21 +110,40 @@ def main(_):
             summary_writer.add_summary(val_summary, epoch)
 
         # Testing
+        n_tracks = max(test_set['track_id']) + 1
+        actual_track_genres = [None for _ in range(n_tracks)]
         batch_count = 0
-        test_accuracy = 0
+        test_raw_accuracy = 0.0
+        test_sum_probabilities = [np.array([0.0 for _ in range(10)]) for _ in range(n_tracks)]
+        test_votes = [[0 for _ in range(10)] for _ in range(n_tracks)]
+
         for i in range(0, len(test_set['labels']), FLAGS.batch_size):
             test_batch_spectrograms = map(utils.melspectrogram,
-                                             test_set['data'][i:i + FLAGS.batch_size])
+                                          test_set['data'][i:i + FLAGS.batch_size])
             test_batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
-            test_batch_accuracy = sess.run(raw_accuracy, feed_dict={training: False,
-                                                                spectrograms: test_batch_spectrograms,
-                                                                labels: test_batch_labels})
+            batch_accuracy, batch_probs, batch_vote = sess.run([raw_accuracy, logits, votes],
+                                                               feed_dict={training: False,
+                                                                          spectrograms: test_batch_spectrograms,
+                                                                          labels: test_batch_labels})
+
+            test_raw_accuracy += batch_accuracy
             batch_count += 1
-            test_accuracy += test_batch_accuracy
 
-        test_accuracy /= batch_count
+            for x, track_id in enumerate(test_set['track_id'][i:i + FLAGS.batch_size]):
+                test_sum_probabilities[track_id] += batch_probs[x]
+                test_votes[track_id][batch_vote[x]] += 1
+                actual_track_genres[track_id] = test_batch_labels[x]
 
-        print('test set: accuracy on test set: %0.3f' % test_accuracy)
+        correct_with_probs = 0.0
+        correct_with_votes = 0.0
+        for genre, probabilites, votes in zip(actual_track_genres, test_sum_probabilities, test_votes):
+            correct_with_probs += 1.0 if np.argmax(probabilites) == genre else 0.0
+            correct_with_votes += 1.0 if np.argmax(votes) == genre else 0.0
+
+
+        print 'Raw Probability accuracy on test set: %0.3f' % (test_raw_accuracy / batch_count)
+        print 'Maximum Probability accuracy on test set: %0.3f' % (correct_with_probs / n_tracks)
+        print 'Majority Vote accuracy on test set: %0.3f' % (correct_with_votes / n_tracks)
 
 
 if __name__ == '__main__':
