@@ -10,7 +10,7 @@
 #SBATCH --mail-type=ALL # Type of email notification- BEGIN,END,FAIL,ALL
 #SBATCH --mail-user=ls14172@bristol.ac.uk # Email to which notifications will be sent
 
-module add libs/tensorflow/1.2
+module add languages/anaconda2/5.0.1.tensorflow-1.6.0
 
 srun python main.py --epochs 30
 wait
