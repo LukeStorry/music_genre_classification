@@ -140,7 +140,7 @@ def graph(x, is_training):
 
     # 10x2x128 tensor
     left_pooling_4 = tf.layers.max_pooling2d(
-        inputs=left_conv_4,
+        inputs=right_conv_4,
         pool_size=[1, 5],
         strides=[1, 5],
         name='left_pooling_4'
@@ -154,10 +154,8 @@ def graph(x, is_training):
         name='right_pooling_4'
     )
 
-
-    # TODO unsure about the numbers here - 8192 prevents error here but breaks the adamoptimiser
-    left_flattened = tf.reshape(left_pooling_4, [1, 8192])
-    right_flattened = tf.reshape(right_pooling_4, [1, 8192])
+    left_flattened = tf.reshape(left_pooling_4, [-1, 2560])
+    right_flattened = tf.reshape(right_pooling_4, [-1, 2560])
 
     merged = tf.concat([left_flattened, right_flattened], 1)
 
@@ -166,7 +164,7 @@ def graph(x, is_training):
     fully_connected_layer = tf.layers.dense(
         inputs=dropout,
         units=200,
-        activation=None,
+        activation=leaky_relu,
         use_bias=True,
         trainable=True,
         kernel_initializer=xavier_initializer,
