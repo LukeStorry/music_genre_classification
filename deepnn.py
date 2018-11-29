@@ -140,7 +140,7 @@ def graph(x, is_training):
 
     # 10x2x128 tensor
     left_pooling_4 = tf.layers.max_pooling2d(
-        inputs=right_conv_4,
+        inputs=left_conv_4,
         pool_size=[1, 5],
         strides=[1, 5],
         name='left_pooling_4'
@@ -148,7 +148,7 @@ def graph(x, is_training):
 
     # 2x10x128 tensor
     right_pooling_4 = tf.layers.max_pooling2d(
-        inputs=left_pooling_4,
+        inputs=right_conv_4,
         pool_size=[5, 1],
         strides=[5, 1],
         name='right_pooling_4'
