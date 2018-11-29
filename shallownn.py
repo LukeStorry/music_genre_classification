@@ -43,8 +43,8 @@ def graph(x, is_training):
         name='right_pooling'
     )
 
-    left_flattened = tf.reshape(left_pooling, [1, 5120])
-    right_flattened = tf.reshape(right_pooling, [1, 5120])
+    left_flattened = tf.reshape(left_pooling, [-1, 5120])
+    right_flattened = tf.reshape(right_pooling, [-1, 5120])
 
     merged = tf.concat([left_flattened, right_flattened], 1)
 

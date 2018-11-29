@@ -1,7 +1,8 @@
 import os
-import time
 import tensorflow as tf
 import numpy as np
+import pickle
+from time import gmtime, localtime
 
 import utils
 import shallownn
@@ -14,7 +15,7 @@ tf.app.flags.DEFINE_string(
 tf.app.flags.DEFINE_integer(
     'epochs', 100, 'Number of epochs to run. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
-    'samples', 11250, 'How many training samples to use (default: %(default)d)')
+    'samples', -1, 'How many training samples to use (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 
@@ -25,12 +26,12 @@ tf.app.flags.DEFINE_integer(
 tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd(
 )), 'Directory where to write event logs and checkpoint. (default: %(default)s)')
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_{}_{}_{}'.format(
-    FLAGS.depth, FLAGS.epochs, int(time.time())))
+run_log_dir = os.path.join(FLAGS.log_dir, '{}_d{}_e{}'.format(
+    strftime("%Y%d%m_%H%M%S", localtime()), FLAGS.depth, FLAGS.epochs,))
 
 
 def main(_):
-    print "Building ", FLAGS.depth, "network."
+    print "Building", FLAGS.depth, "network...",
     tf.reset_default_graph()
 
     # Create the model
@@ -66,22 +67,29 @@ def main(_):
     acc_summary = tf.summary.scalar('Raw Accuracy', raw_accuracy)
     la_summary = tf.summary.merge([loss_summary, acc_summary])
 
-    # saver for checkpoints
-    saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+    print "done"
 
     # Import data
-    train_set, test_set = utils.load_music()
+    print "Loading data...",
+    with open('music_genres_dataset.pkl', 'rb') as f:
+        train_set, test_set = pickle.load(f), pickle.load(f)
+    print "done."
+
+    # TODO augmentation here to extend t_s['data']
+
+    print "Calculating melspectrograms...",
+    train_set['melspectrograms'] = np.array(
+        map(utils.melspectrogram, train_set['data'][:FLAGS.samples]), copy=False)
+    train_set['labels'] = np.array(train_set['labels'][:FLAGS.samples], copy=False)
+    train_indices = range(len(train_set['melspectrograms']))
+    test_set['melspectrograms'] = map(utils.melspectrogram, test_set['data'])
+    print " done."
 
     with tf.Session() as sess:
         summary_writer = tf.summary.FileWriter(run_log_dir + '_train', sess.graph)
         summary_writer_validation = tf.summary.FileWriter(run_log_dir + '_validate', sess.graph)
 
         sess.run(tf.global_variables_initializer())
-
-        # Set up training lists to be selectable by shuffled list of indices
-        train_labels = np.array(train_set['labels'])[:FLAGS.samples]
-        train_data = np.array(train_set['data'])[:FLAGS.samples]
-        train_indices = range(len(train_labels))
         # get shuffled list of indices for validation set
         np.random.shuffle(train_indices)
         validation_indices = train_indices[:FLAGS.batch_size]
@@ -91,22 +99,17 @@ def main(_):
             np.random.shuffle(train_indices)  # shuffle training every epoch
 
             # Training loop by batches
-            for i in range(0, len(train_labels), FLAGS.batch_size):
-                train_batch_spectrograms = map(utils.melspectrogram,
-                                               train_data[train_indices][i:i + FLAGS.batch_size])
-                train_batch_labels = train_labels[train_indices][i:i + FLAGS.batch_size]
-                sess.run(train_step, feed_dict={training: True,
-                                                spectrograms: train_batch_spectrograms,
-                                                labels: train_batch_labels})
+            for i in range(0, len(train_set['melspectrograms']), FLAGS.batch_size):
+                sess.run(train_step, feed_dict={
+                    training: True,
+                    spectrograms: train_set['melspectrograms'][train_indices][i:i + FLAGS.batch_size],
+                    labels: train_set['labels'][train_indices][i:i + FLAGS.batch_size]})
 
             # Validation with same pre-made selection of train set
-            v_batch_spectrograms = map(utils.melspectrogram,
-                                       train_data[validation_indices])
-            v_batch_labels = train_labels[validation_indices]
             val_accuracy, val_summary = sess.run([raw_accuracy, la_summary], feed_dict={
-                                                 training: False,
-                                                 spectrograms: v_batch_spectrograms,
-                                                 labels: v_batch_labels})
+                training: False,
+                spectrograms: train_set['melspectrograms'][validation_indices],
+                labels: train_set['labels'][validation_indices]})
 
             print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
             summary_writer.add_summary(val_summary, epoch)
@@ -119,22 +122,20 @@ def main(_):
         test_sum_probabilities = [np.array([0.0 for _ in range(10)]) for _ in range(n_tracks)]
         test_votes = [[0 for _ in range(10)] for _ in range(n_tracks)]
 
-        for i in range(0, len(test_set['labels']), FLAGS.batch_size):
-            test_batch_spectrograms = map(utils.melspectrogram,
-                                          test_set['data'][i:i + FLAGS.batch_size])
-            test_batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
-            batch_accuracy, batch_probs, batch_vote = sess.run([raw_accuracy, logits, votes],
-                                                               feed_dict={training: False,
-                                                                          spectrograms: test_batch_spectrograms,
-                                                                          labels: test_batch_labels})
+        for i in range(0, len(test_set['melspectrograms']), FLAGS.batch_size):
+            batch_labels = test_set['labels'][i:i + FLAGS.batch_size]
+            batch_accuracy, batch_probs, batch_vote = sess.run([raw_accuracy, logits, votes], feed_dict={
+                training: False,
+                spectrograms: test_set['melspectrograms'][i:i + FLAGS.batch_size],
+                labels: batch_labels})
 
             test_raw_accuracy += batch_accuracy
             batch_count += 1
 
-            for x, track_id in enumerate(test_set['track_id'][i:i + FLAGS.batch_size]):
-                test_sum_probabilities[track_id] += batch_probs[x]
-                test_votes[track_id][batch_vote[x]] += 1
-                actual_track_genres[track_id] = test_batch_labels[x]
+            for sample, track_id in enumerate(test_set['track_id'][i:i + FLAGS.batch_size]):
+                test_sum_probabilities[track_id] += batch_probs[sample]
+                test_votes[track_id][batch_vote[sample]] += 1
+                actual_track_genres[track_id] = batch_labels[sample]
 
         correct_with_probs = 0.0
         correct_with_votes = 0.0
