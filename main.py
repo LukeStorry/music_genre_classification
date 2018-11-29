@@ -23,7 +23,7 @@ tf.app.flags.DEFINE_integer(
 tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd(
 )), 'Directory where to write event logs and checkpoint. (default: %(default)s)')
 
-run_log_dir = os.path.join(FLAGS.log_dir, '{}_d{}_e{}'.format(
+run_log_dir = os.path.join(FLAGS.log_dir, '{}_{}_{}ep'.format(
     strftime("%Y%d%m_%H%M%S", localtime()), FLAGS.depth, FLAGS.epochs,))
 
 
@@ -36,9 +36,12 @@ def main(_):
     spectrograms_placeholder = tf.placeholder(tf.float32, [None, 80, 80])
     labels_placeholder = tf.placeholder(tf.int64, [None, ])
     dataset = tf.data.Dataset.from_tensor_slices((spectrograms_placeholder, labels_placeholder))
-    dataset = dataset.shuffle(buffer_size=FLAGS.samples).batch(FLAGS.batch_size)
-    iterator = dataset.make_initializable_iterator()
-    spectrograms, labels = iterator.get_next()
+
+    train_iterator = dataset.shuffle(buffer_size=FLAGS.samples).batch(
+        FLAGS.batch_size).make_initializable_iterator()
+    test_iterator = dataset.batch(FLAGS.batch_size).make_initializable_iterator()
+
+    spectrograms, labels = tf.cond(training, train_iterator.get_next, test_iterator.get_next)
 
     # Build the graph for the shallow network
     if FLAGS.depth == 'shallow':
@@ -85,14 +88,14 @@ def main(_):
         summary_writer_validation = tf.summary.FileWriter(run_log_dir + '_validate', sess.graph)
 
         sess.run(tf.global_variables_initializer())
-        # get shuffled list of indices for validation batch
+        # get pre-shuffled list of indices for validation batch
         validation_indices = range(len(train_set['melspectrograms']))
         np.random.shuffle(validation_indices)
         validation_indices = validation_indices[:FLAGS.batch_size]
 
         # Training & Validation by epoch
         for epoch in range(FLAGS.epochs):
-            sess.run(iterator.initializer, feed_dict={
+            sess.run(train_iterator.initializer, feed_dict={
                 spectrograms_placeholder: train_set['melspectrograms'],
                 labels_placeholder: train_set['labels']})
 
@@ -104,7 +107,7 @@ def main(_):
                     break
 
             # Validation with same pre-made selection of train set
-            sess.run(iterator.initializer, feed_dict={
+            sess.run(test_iterator.initializer, feed_dict={
                 spectrograms_placeholder: train_set['melspectrograms'][validation_indices],
                 labels_placeholder: train_set['labels'][validation_indices]})
 
@@ -114,28 +117,37 @@ def main(_):
             print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
             summary_writer.add_summary(val_summary, epoch)
 
-        # Testing # TODO do we keep with feeding by-batch, or extend the Dataset to include track_id?
-        n_tracks = max(test_set['track_id']) + 1
-        actual_track_genres = [None for _ in range(n_tracks)]
-        for track, label in zip(test_set['track_id'], test_set['labels']):
-            actual_track_genres[track] = label
-        batch_count = 0
-        test_raw_accuracy = 0.0
-        test_sum_probabilities = [np.array([0.0 for _ in range(10)]) for _ in range(n_tracks)]
-        test_votes = [[0 for _ in range(10)] for _ in range(n_tracks)]
+        # Testing
+        n_tracks = 1000
+        n_labels = 10
+        actual_track_genres = [x[1] for x in
+                               sorted(set(zip(test_set['track_id'], test_set['labels'])))]
 
-        for i in range(0, len(test_set['melspectrograms']), FLAGS.batch_size):
-            batch_accuracy, batch_probs, batch_vote = sess.run([raw_accuracy, logits, votes], feed_dict={
-                training: False,
-                spectrograms: test_set['melspectrograms'][i:i + FLAGS.batch_size],
-                labels: test_set['labels'][i:i + FLAGS.batch_size]})
+        test_raw_accuracy = 0.0
+        test_sum_probabilities = [np.array([0.0 for _ in range(n_labels)])
+                                  for _ in range(n_tracks)]
+        test_votes = [[0 for _ in range(n_labels)] for _ in range(n_tracks)]
+
+        sess.run(test_iterator.initializer, feed_dict={
+            spectrograms_placeholder: test_set['melspectrograms'],
+            labels_placeholder: test_set['labels']})
+
+        batch_count = 0
+        while True:
+            try:
+                batch_accuracy, batch_probs, batch_vote = sess.run([raw_accuracy, logits, votes],
+                                                                   feed_dict={training: False})
+            except tf.errors.OutOfRangeError:
+                break
 
             test_raw_accuracy += batch_accuracy
-            batch_count += 1
-
-            for sample, track_id in enumerate(test_set['track_id'][i:i + FLAGS.batch_size]):
+            for sample, track_id in enumerate(test_set['track_id'][batch_count:batch_count + FLAGS.batch_size]):
                 test_sum_probabilities[track_id] += batch_probs[sample]
                 test_votes[track_id][batch_vote[sample]] += 1
+                if sample == len(batch_probs)-1:
+                    break
+
+            batch_count += 1
 
         correct_with_probs = 0.0
         correct_with_votes = 0.0
@@ -143,15 +155,16 @@ def main(_):
             correct_with_probs += 1.0 if np.argmax(probabilites) == genre else 0.0
             correct_with_votes += 1.0 if np.argmax(votes) == genre else 0.0
 
-
-        # correct_with_probs = np.sum(np.equal(
+        # correct_with_probs_2 = np.sum(np.equal(
         #     actual_track_genres, np.argmax(test_sum_probabilities, 1)))
-        # correct_with_votes = np.sum(np.equal(
+        # correct_with_votes_2 = np.sum(np.equal(
         #     actual_track_genres, np.argmax(test_votes, 1)))
 
         print 'Raw Probability accuracy on test set: %0.3f' % (test_raw_accuracy / batch_count)
         print 'Maximum Probability accuracy on test set: %0.3f' % (correct_with_probs / n_tracks)
         print 'Majority Vote accuracy on test set: %0.3f' % (correct_with_votes / n_tracks)
+        print 'Maximum Probability2 accuracy on test set: %0.3f' % (correct_with_probs_2 / n_tracks)
+        print 'Majority Vote accuracy2 on test set: %0.3f' % (correct_with_votes_2 / n_tracks)
 
 
 if __name__ == '__main__':
