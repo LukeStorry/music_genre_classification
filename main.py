@@ -111,21 +111,21 @@ def main(_):
                 spectrograms_placeholder: train_set['melspectrograms'][validation_indices],
                 labels_placeholder: train_set['labels'][validation_indices]})
 
-            val_accuracy, val_summary = sess.run(
-                [raw_accuracy, la_summary], feed_dict={training: False})
+            val_accuracy, val_summary = sess.run([raw_accuracy, la_summary],
+                                                 feed_dict={training: False})
 
             print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
             summary_writer.add_summary(val_summary, epoch)
 
         # Testing
-        n_tracks = 1000
-        n_labels = 10
         actual_track_genres = [x[1] for x in
                                sorted(set(zip(test_set['track_id'], test_set['labels'])))]
+        n_tracks = len(actual_track_genres)
+        n_labels = max(actual_track_genres) + 1
 
         test_raw_accuracy = 0.0
-        test_sum_probabilities = [np.array([0.0 for _ in range(n_labels)])
-                                  for _ in range(n_tracks)]
+        test_probabilities = [np.array([0.0 for _ in range(n_labels)])
+                              for _ in range(n_tracks)]
         test_votes = [[0 for _ in range(n_labels)] for _ in range(n_tracks)]
 
         sess.run(test_iterator.initializer, feed_dict={
@@ -135,36 +135,28 @@ def main(_):
         batch_count = 0
         while True:
             try:
-                batch_accuracy, batch_probs, batch_vote = sess.run([raw_accuracy, logits, votes],
-                                                                   feed_dict={training: False})
+                batch_accuracy, batch_probabilities, batch_vote = sess.run([raw_accuracy, logits, votes],
+                                                                           feed_dict={training: False})
             except tf.errors.OutOfRangeError:
                 break
 
             test_raw_accuracy += batch_accuracy
             for sample, track_id in enumerate(test_set['track_id'][batch_count:batch_count + FLAGS.batch_size]):
-                test_sum_probabilities[track_id] += batch_probs[sample]
+                test_probabilities[track_id] += batch_probabilities[sample]
                 test_votes[track_id][batch_vote[sample]] += 1
-                if sample == len(batch_probs)-1:
+                if sample == len(batch_probabilities) - 1:
                     break
 
             batch_count += 1
 
-        correct_with_probs = 0.0
-        correct_with_votes = 0.0
-        for genre, probabilites, votes in zip(actual_track_genres, test_sum_probabilities, test_votes):
-            correct_with_probs += 1.0 if np.argmax(probabilites) == genre else 0.0
-            correct_with_votes += 1.0 if np.argmax(votes) == genre else 0.0
-
-        # correct_with_probs_2 = np.sum(np.equal(
-        #     actual_track_genres, np.argmax(test_sum_probabilities, 1)))
-        # correct_with_votes_2 = np.sum(np.equal(
-        #     actual_track_genres, np.argmax(test_votes, 1)))
+        correct_with_probs = float(np.sum(np.equal(
+                        actual_track_genres, np.argmax(test_probabilities, 1))))
+        correct_with_votes = float(np.sum(np.equal(
+                        actual_track_genres, np.argmax(test_votes, 1))))
 
         print 'Raw Probability accuracy on test set: %0.3f' % (test_raw_accuracy / batch_count)
         print 'Maximum Probability accuracy on test set: %0.3f' % (correct_with_probs / n_tracks)
         print 'Majority Vote accuracy on test set: %0.3f' % (correct_with_votes / n_tracks)
-        print 'Maximum Probability2 accuracy on test set: %0.3f' % (correct_with_probs_2 / n_tracks)
-        print 'Majority Vote accuracy2 on test set: %0.3f' % (correct_with_votes_2 / n_tracks)
 
 
 if __name__ == '__main__':
