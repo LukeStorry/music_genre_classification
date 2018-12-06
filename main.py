@@ -89,7 +89,7 @@ def main(_):
 
         sess.run(tf.global_variables_initializer())
         # get pre-shuffled list of indices for validation batch
-        validation_indices = range(len(train_set['melspectrograms']))
+        validation_indices = range(len(test_set['melspectrograms']))
         np.random.shuffle(validation_indices)
         validation_indices = validation_indices[:FLAGS.batch_size]
 
@@ -107,9 +107,10 @@ def main(_):
                     break
 
             # Validation with same pre-made selection of train set
+
             sess.run(test_iterator.initializer, feed_dict={
-                spectrograms_placeholder: train_set['melspectrograms'][validation_indices],
-                labels_placeholder: train_set['labels'][validation_indices]})
+                spectrograms_placeholder: [test_set['melspectrograms'][entry] for entry in validation_indices],
+                labels_placeholder: [test_set['labels'][entry] for entry in validation_indices]})
 
             val_accuracy, val_summary = sess.run([raw_accuracy, la_summary],
                                                  feed_dict={training: False})
