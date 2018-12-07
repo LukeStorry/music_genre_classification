@@ -6,6 +6,10 @@ __pycache__/
 # Logs
 /logs
 
+# outputs
+*.out
+*.err
+
 # C extensions
 *.so
 

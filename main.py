@@ -142,7 +142,7 @@ def main(_):
                 break
 
             test_raw_accuracy += batch_accuracy
-            for sample, track_id in enumerate(test_set['track_id'][batch_count:batch_count + FLAGS.batch_size]):
+            for sample, track_id in enumerate(test_set['track_id'][FLAGS.batch_size*batch_count:FLAGS.batch_size*batch_count + FLAGS.batch_size]):
                 test_probabilities[track_id] += batch_probabilities[sample]
                 test_votes[track_id][batch_vote[sample]] += 1
                 if sample == len(batch_probabilities) - 1:
