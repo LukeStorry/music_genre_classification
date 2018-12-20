@@ -16,6 +16,7 @@ tf.app.flags.DEFINE_integer(
     'epochs', 100, 'Number of epochs to run. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'samples', 11250, 'How many training samples to use (default: %(default)d)')
+tf.app.flags.DEFINE_boolean('augmentation', False, 'Whether to augment the data or not. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
@@ -74,7 +75,32 @@ def main(_):
         train_set, test_set = pickle.load(f), pickle.load(f)
     print "  done."
 
-    # TODO augmentation here to extend t_s['data']
+    # Augment data
+    def augment(train_set, deformation, factors, aug_samples=3):
+        n_tracks = len(set(train_set['track_id']))
+        samples_per_track = train_set['track_id'].count(0)
+        for track_id in range(n_tracks):
+            for random_choice in np.random.choice(range(samples_per_track), aug_samples):
+                sample_index = random_choice + track_id*samples_per_track
+                for factor in parameters:
+                    augmented_sample = deformation(train_set['data'][sample_index], factor)
+                    train_set['data'].append(augmented_sample)
+                    train_set['track_id'].append(train_set['track_id'][sample_index])
+                    train_set['label'].append(train_set['label'][sample_index])
+                            
+    if FLAGS.augmentation:
+            time_stretch = lambda sample, half_steps: librosa.effects.time_stretch(sample, 22050, half_steps)
+            pitch_shift = lambda sample, rate: librosa.effects.pitch_shift(sample, rate)
+            
+            print(len(train_set['data']))
+            augment(train_set, time_stretch, [0.2, 0.5, 1.2, 1.5])
+            print(len(train_set['data']))
+            augment(train_set, pitch_shift, [-5, -2, 2, 5])
+            print(len(train_set['data']))
+
+            
+            
+        
 
     print "Calculating melspectrograms..."
     train_set['melspectrograms'] = np.array(
