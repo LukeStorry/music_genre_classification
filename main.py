@@ -16,7 +16,8 @@ tf.app.flags.DEFINE_integer(
     'epochs', 100, 'Number of epochs to run. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'samples', 11250, 'How many training samples to use (default: %(default)d)')
-tf.app.flags.DEFINE_boolean('augmentation', False, 'Whether to augment the data or not. (default: %(default)d)')
+tf.app.flags.DEFINE_boolean(
+    'augment', False, 'Whether to augment the data or not. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
@@ -29,19 +30,22 @@ run_log_dir = os.path.join(FLAGS.log_dir, '{}_{}_{}ep'.format(
 
 
 def main(_):
-    print "Building", FLAGS.depth, "network..."
+    print "Building", FLAGS.depth, "network, with", FLAGS.samples, "samples,",
+    print("with" if FLAGS.augment else "without"), "augmentation"
     tf.reset_default_graph()
 
-    # Set up the inputs and dataset iterator
+    # Set up the inputs and Dataset object
     training = tf.placeholder(tf.bool)
     spectrograms_placeholder = tf.placeholder(tf.float32, [None, 80, 80])
     labels_placeholder = tf.placeholder(tf.int64, [None, ])
     dataset = tf.data.Dataset.from_tensor_slices((spectrograms_placeholder, labels_placeholder))
 
+    # Set up the two iterators to shuffle the data and split into batches
     train_iterator = dataset.shuffle(buffer_size=FLAGS.samples).batch(
         FLAGS.batch_size).make_initializable_iterator()
     test_iterator = dataset.batch(FLAGS.batch_size).make_initializable_iterator()
 
+    # Set the graph up to use the correct iterator (we don't want to shuffle the test data)
     spectrograms, labels = tf.cond(training, train_iterator.get_next, test_iterator.get_next)
 
     # Build the graph for the shallow network
@@ -58,7 +62,7 @@ def main(_):
                                   beta2=0.999, epsilon=1e-08, name="adam")
     train_step = adam.minimize(cross_entropy)
 
-    # count correct predictions and calculate the accuracy
+    # Calculate max predictions and calculate the accuracy
     votes = tf.argmax(logits, 1)
     raw_accuracy = tf.reduce_mean(tf.cast(tf.equal(votes, labels), tf.float32))
 
@@ -67,86 +71,84 @@ def main(_):
     acc_summary = tf.summary.scalar('Raw Accuracy', raw_accuracy)
     la_summary = tf.summary.merge([loss_summary, acc_summary])
 
+    # log to console if the graph has been set up without errors
     print "  done "
 
-    # Import data
+    # Import data, shorten if not all samples wanted, and convert to np.array
     print "Loading data..."
     with open('music_genres_dataset.pkl', 'rb') as f:
         train_set, test_set = pickle.load(f), pickle.load(f)
+    train_set['data'] = train_set['data'][:FLAGS.samples]
+    train_set['labels'] = train_set['labels'][:FLAGS.samples]
+    train_set['track_id'] = train_set['track_id'][:FLAGS.samples]
+    test_set['labels'] = np.array(test_set['labels'], copy=False)
     print "  done."
 
-    # Augment data
-    def augment(train_set, deformation, factors, aug_samples=3):
-        n_tracks = len(set(train_set['track_id']))
-        samples_per_track = train_set['track_id'].count(0)
-        for track_id in range(n_tracks):
-            for random_choice in np.random.choice(range(samples_per_track), aug_samples):
-                sample_index = random_choice + track_id*samples_per_track
-                for factor in parameters:
-                    augmented_sample = deformation(train_set['data'][sample_index], factor)
-                    train_set['data'].append(augmented_sample)
-                    train_set['track_id'].append(train_set['track_id'][sample_index])
-                    train_set['label'].append(train_set['label'][sample_index])
-                            
-    if FLAGS.augmentation:
-            time_stretch = lambda sample, half_steps: librosa.effects.time_stretch(sample, 22050, half_steps)
-            pitch_shift = lambda sample, rate: librosa.effects.pitch_shift(sample, rate)
-            
-            print(len(train_set['data']))
-            augment(train_set, time_stretch, [0.2, 0.5, 1.2, 1.5])
-            print(len(train_set['data']))
-            augment(train_set, pitch_shift, [-5, -2, 2, 5])
-            print(len(train_set['data']))
+    # Optionally Augment the Data by appending to the training set's lists
+    if FLAGS.augment:
+        def augment(train_set, deformation, factors, aug_samples=3, samples_per_track=15):
+            n_tracks = len(set(train_set['track_id']))
+            for track_id in range(n_tracks):
+                for random_choice in np.random.choice(range(samples_per_track), aug_samples):
+                    sample_index = random_choice + track_id * samples_per_track
+                    for factor in factors:
+                        augmented_sample = deformation(train_set['data'][sample_index], factor)
+                        train_set['data'].append(augmented_sample)
+                        train_set['track_id'].append(train_set['track_id'][sample_index])
+                        train_set['labels'].append(train_set['labels'][sample_index])
 
-            
-            
-        
+        print "Augmenting data..."
+        augment(train_set, utils.time_stretch, [0.2, 0.5, 1.2, 1.5])
+        print "  Time Stretching Done."
+        augment(train_set, utils.pitch_shift, [-5, -2, 2, 5])
+        print "  Pitch Shifting Done."
+        print len(train_set['data'])
 
+    # Calculate the Melsepctrograms from the audio files in the data lists
     print "Calculating melspectrograms..."
-    train_set['melspectrograms'] = np.array(
-        map(utils.melspectrogram, train_set['data'][:FLAGS.samples]), copy=False)
-    train_set['labels'] = np.array(train_set['labels'][:FLAGS.samples], copy=False)
-    test_set['melspectrograms'] = map(utils.melspectrogram, test_set['data'])
+    train_set['melspectrograms'] = np.array(map(utils.melspectrogram, train_set['data']))
+    test_set['melspectrograms'] = np.array(map(utils.melspectrogram, test_set['data']))
     print "  done."
 
+    # Now everything has been set up, we can launch a Tensorflow Session
     with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
         summary_writer = tf.summary.FileWriter(run_log_dir + '_train', sess.graph)
         summary_writer_validation = tf.summary.FileWriter(run_log_dir + '_validate', sess.graph)
 
-        sess.run(tf.global_variables_initializer())
-        # get pre-shuffled list of indices for validation batch
+        # Create a shuffled list of indices to define the validation batch
         validation_indices = range(len(test_set['melspectrograms']))
         np.random.shuffle(validation_indices)
         validation_indices = validation_indices[:FLAGS.batch_size]
 
-        # Training & Validation by epoch
+        # Train & Validate by epoch
         for epoch in range(FLAGS.epochs):
             sess.run(train_iterator.initializer, feed_dict={
                 spectrograms_placeholder: train_set['melspectrograms'],
                 labels_placeholder: train_set['labels']})
 
-            # Training continues until end of epoch - https://www.tensorflow.org/guide/datasets#consuming_values_from_an_iterator
+            # Repeat the Train Step until all Data used (end of epoch) - https://www.tensorflow.org/guide/datasets#consuming_values_from_an_iterator
             while True:
                 try:
                     sess.run(train_step, feed_dict={training: True})
                 except tf.errors.OutOfRangeError:
                     break
 
-            # Validation with same pre-made selection of train set
-
+            # Validation with the pre-selected indices of train set
             sess.run(test_iterator.initializer, feed_dict={
-                spectrograms_placeholder: [test_set['melspectrograms'][entry] for entry in validation_indices],
-                labels_placeholder: [test_set['labels'][entry] for entry in validation_indices]})
+                spectrograms_placeholder: test_set['melspectrograms'][validation_indices],
+                labels_placeholder: test_set['labels'][validation_indices]})
 
             val_accuracy, val_summary = sess.run([raw_accuracy, la_summary],
                                                  feed_dict={training: False})
 
-            print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
             summary_writer.add_summary(val_summary, epoch)
+            print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
 
-        # Testing
-        actual_track_genres = [x[1] for x in
-                               sorted(set(zip(test_set['track_id'], test_set['labels'])))]
+
+        # Testing after the Training has finished
+        actual_track_genres = [x[1]
+                               for x in sorted(set(zip(test_set['track_id'], test_set['labels'])))]
         n_tracks = len(actual_track_genres)
         n_labels = max(actual_track_genres) + 1
 
@@ -155,35 +157,39 @@ def main(_):
                               for _ in range(n_tracks)]
         test_votes = [[0 for _ in range(n_labels)] for _ in range(n_tracks)]
 
+        # Set up the Training Iterator with the Training Set data
         sess.run(test_iterator.initializer, feed_dict={
             spectrograms_placeholder: test_set['melspectrograms'],
             labels_placeholder: test_set['labels']})
 
         batch_count = 0
+        # Repeatedly run the Accuracy and Voting calculations, caching the values at the end of each batch
         while True:
             try:
                 batch_accuracy, batch_probabilities, batch_vote = sess.run([raw_accuracy, logits, votes],
-                                                                           feed_dict={training: False})
+                                feed_dict={training: False})
+
+            # If we have used all the data, exit the loop.
             except tf.errors.OutOfRangeError:
                 break
 
             test_raw_accuracy += batch_accuracy
-            for sample, track_id in enumerate(test_set['track_id'][FLAGS.batch_size*batch_count:FLAGS.batch_size*batch_count + FLAGS.batch_size]):
+            # Loop through each sample in the batch and increment the corresponding probability and votes lists
+            batch_index = FLAGS.batch_size * batch_count
+            for sample, track_id in enumerate(test_set['track_id'][batch_index: batch_index + FLAGS.batch_size]):
                 test_probabilities[track_id] += batch_probabilities[sample]
                 test_votes[track_id][batch_vote[sample]] += 1
                 if sample == len(batch_probabilities) - 1:
                     break
-
             batch_count += 1
 
-        correct_with_probs = float(np.sum(np.equal(
-                        actual_track_genres, np.argmax(test_probabilities, 1))))
-        correct_with_votes = float(np.sum(np.equal(
-                        actual_track_genres, np.argmax(test_votes, 1))))
+        # Count the total amount of correct predictions
+        correct_with_probs = np.sum(np.equal(actual_track_genres, np.argmax(test_probabilities, 1)))
+        correct_with_votes = np.sum(np.equal(actual_track_genres, np.argmax(test_votes, 1)))
 
-        print 'Raw Probability accuracy on test set: %0.3f' % (test_raw_accuracy / batch_count)
-        print 'Maximum Probability accuracy on test set: %0.3f' % (correct_with_probs / n_tracks)
-        print 'Majority Vote accuracy on test set: %0.3f' % (correct_with_votes / n_tracks)
+        print 'Raw Probability accuracy on test set: %0.3f' % ( float(test_raw_accuracy) / batch_count)
+        print 'Maximum Probability accuracy on test set: %0.3f' % ( float(correct_with_probs) / n_tracks)
+        print 'Majority Vote accuracy on test set: %0.3f' % ( float(correct_with_votes) / n_tracks)
 
 
 if __name__ == '__main__':
