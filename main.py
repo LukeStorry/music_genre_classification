@@ -17,7 +17,7 @@ tf.app.flags.DEFINE_integer(
 tf.app.flags.DEFINE_integer(
     'samples', 11250, 'How many training samples to use (default: %(default)d)')
 tf.app.flags.DEFINE_boolean(
-    'augment', False, 'Whether to augment the data or not. (default: %(default)d)')
+    'augment', False, 'Whether to do Data-Augmentation. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
@@ -86,23 +86,26 @@ def main(_):
 
     # Optionally Augment the Data by appending to the training set's lists
     if FLAGS.augment:
-        def augment(train_set, deformation, factors, aug_samples=3, samples_per_track=15):
-            n_tracks = len(set(train_set['track_id']))
-            for track_id in range(n_tracks):
-                for random_choice in np.random.choice(range(samples_per_track), aug_samples):
-                    sample_index = random_choice + track_id * samples_per_track
-                    for factor in factors:
-                        augmented_sample = deformation(train_set['data'][sample_index], factor)
-                        train_set['data'].append(augmented_sample)
-                        train_set['track_id'].append(train_set['track_id'][sample_index])
-                        train_set['labels'].append(train_set['labels'][sample_index])
-
         print "Augmenting data..."
-        augment(train_set, utils.time_stretch, [0.2, 0.5, 1.2, 1.5])
-        print "  Time Stretching Done."
-        augment(train_set, utils.pitch_shift, [-5, -2, 2, 5])
-        print "  Pitch Shifting Done."
-        print len(train_set['data'])
+        n_tracks = len(set(train_set['track_id']))
+        samples_per_track=train_set['track_id'].count(0)
+        for track_id in range(n_tracks):
+            # randomly choose three segments for each track
+            for random_choice in np.random.choice(range(samples_per_track), 3):
+                segment_index = random_choice + track_id * samples_per_track
+                # Apply each time-stretch to the segment
+                stretched_segments = [utils.time_stretch(train_set['data'][segment_index], factor)
+                                for factor in [0.2, 0.5, 1.2, 1.5]]
+                # Then apply pitch-shift to all of those
+                augmentations = [utils.pitch_shift(segment, factor)
+                                    for segment in stretched_segments
+                                    for factor in [-5, -2, 2, 5]]
+
+                # Append the extra samples to the training set
+                train_set['data'] += augmentations
+                train_set['track_id'] += [train_set['track_id'][segment_index]] *  len(augmentations)
+                train_set['labels'] += [train_set['labels'][segment_index]]*  len(augmentations)
+        print "  done."
 
     # Calculate the Melsepctrograms from the audio files in the data lists
     print "Calculating melspectrograms..."
