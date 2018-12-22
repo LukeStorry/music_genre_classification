@@ -16,7 +16,7 @@ def graph(x, is_training):
         kernel_size=[10, 23],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='left_conv'
     )
@@ -26,7 +26,7 @@ def graph(x, is_training):
         kernel_size=[21, 20],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='right_conv'
     )
@@ -52,7 +52,7 @@ def graph(x, is_training):
         kernel_size=[5, 11],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='left_conv_2'
     )
@@ -62,7 +62,7 @@ def graph(x, is_training):
         kernel_size=[10, 5],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='right_conv_2'
     )
@@ -87,7 +87,7 @@ def graph(x, is_training):
         kernel_size=[3, 5],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='left_conv_3'
     )
@@ -97,7 +97,7 @@ def graph(x, is_training):
         kernel_size=[5, 3],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='right_conv_3'
     )
@@ -123,7 +123,7 @@ def graph(x, is_training):
         kernel_size=[2, 4],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='left_conv_4'
     )
@@ -133,7 +133,7 @@ def graph(x, is_training):
         kernel_size=[4, 2],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='right_conv_4'
     )

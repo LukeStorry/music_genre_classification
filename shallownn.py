@@ -16,7 +16,7 @@ def graph(x, is_training):
         kernel_size=[10, 23],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,  # TODO is this not meant to be True?
+        use_bias=True,  # TODO is this not meant to be True?
         kernel_initializer=xavier_initializer,
         name='left_conv'
     )
@@ -26,7 +26,7 @@ def graph(x, is_training):
         kernel_size=[21, 20],
         padding='same',
         activation=leaky_relu,
-        use_bias=False,  # TODO is this not meant to be True?
+        use_bias=True,  # TODO is this not meant to be True?
         kernel_initializer=xavier_initializer,
         name='right_conv'
     )
