@@ -3,8 +3,8 @@ import tensorflow as tf
 xavier_initializer = tf.contrib.layers.xavier_initializer(uniform=True)
 
 
-def leaky_relu(x, alpha=0.3):
-    return tf.maximum(x, alpha * x)
+def leaky_relu(x):
+    return tf.nn.leaky_relu(x, alpha=0.3)
 
 
 def graph(x, is_training):
