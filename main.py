@@ -133,7 +133,8 @@ def main(_):
             # Repeat the Train Step until all Data used (end of epoch) - https://www.tensorflow.org/guide/datasets#consuming_values_from_an_iterator
             while True:
                 try:
-                    sess.run(train_step, feed_dict={training: True})
+                    _, tr_summary = sess.run([train_step, la_summary], feed_dict={training: True})
+                    summary_writer.add_summmary(tr_summary, epoch)
                 except tf.errors.OutOfRangeError:
                     break
 
@@ -145,7 +146,7 @@ def main(_):
             val_accuracy, val_summary = sess.run([raw_accuracy, la_summary],
                                                  feed_dict={training: False})
 
-            summary_writer.add_summary(val_summary, epoch)
+            summary_writer_validation.add_summary(val_summary, epoch)
             print('epoch %d, accuracy on validation batch: %g' % (epoch, val_accuracy))
 
 
