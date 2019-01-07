@@ -134,7 +134,7 @@ def main(_):
             while True:
                 try:
                     _, tr_summary = sess.run([train_step, la_summary], feed_dict={training: True})
-                    summary_writer.add_summmary(tr_summary, epoch)
+                    summary_writer.add_summary(tr_summary, epoch)
                 except tf.errors.OutOfRangeError:
                     break
 
