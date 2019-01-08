@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -t 0-3:00 # Runtime in D-HH:MM
+#SBATCH -t 0-10:00 # Runtime in D-HH:MM
 #SBATCH -p gpu # Partition to submit to
 #SBATCH --gres=gpu:1
 #SBATCH --mem=15000
@@ -14,13 +14,13 @@ module add languages/anaconda2/5.0.1.tensorflow-1.6.0
 
 srun python main.py --epochs 100 --depth shallow
 srun python main.py --epochs 200 --depth shallow
-#srun python main.py --epochs 100 --depth shallow --augment True
-#srun python main.py --epochs 200 --depth shallow --augment True
+srun python main.py --epochs 100 --depth shallow --augment True
+srun python main.py --epochs 200 --depth shallow --augment True
 
-#srun python main.py --epochs 100 --depth deep
-#srun python main.py --epochs 200 --depth deep
-#srun python main.py --epochs 100 --depth deep --augment True
-#srun python main.py --epochs 200 --depth deep --augment True
+srun python main.py --epochs 100 --depth deep
+srun python main.py --epochs 200 --depth deep
+srun python main.py --epochs 100 --depth deep --augment True
+srun python main.py --epochs 200 --depth deep --augment True
 
 
 wait
