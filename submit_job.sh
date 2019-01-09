@@ -17,8 +17,8 @@ module add languages/anaconda2/5.0.1.tensorflow-1.6.0
 #srun python main.py --epochs 100 --depth shallow --augment True
 #srun python main.py --epochs 200 --depth shallow --augment True
 
-srun python main.py --epochs 100 --depth deep
-#srun python main.py --epochs 200 --depth deep
+#srun python main.py --epochs 100 --depth deep
+srun python main.py --epochs 200 --depth deep
 #srun python main.py --epochs 100 --depth deep --augment True
 #srun python main.py --epochs 200 --depth deep --augment True
 
