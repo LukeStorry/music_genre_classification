@@ -130,13 +130,19 @@ def main(_):
                 spectrograms_placeholder: train_set['melspectrograms'],
                 labels_placeholder: train_set['labels']})
 
+            written = False
+	    # Getting double entries written in logs causing ugly graphs
             # Repeat the Train Step until all Data used (end of epoch) - https://www.tensorflow.org/guide/datasets#consuming_values_from_an_iterator
             while True:
                 try:
                     _, tr_summary = sess.run([train_step, la_summary], feed_dict={training: True})
-                    summary_writer.add_summary(tr_summary, epoch)
+                    if written == False:
+                    	summary_writer.add_summary(tr_summary, epoch)
+			written = True
                 except tf.errors.OutOfRangeError:
                     break
+
+            written = False
 
             # Validation with the pre-selected indices of train set
             sess.run(test_iterator.initializer, feed_dict={
