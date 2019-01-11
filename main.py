@@ -1,7 +1,6 @@
 import os
 import tensorflow as tf
 import numpy as np
-import pickle
 from time import strftime, localtime
 
 import utils
@@ -30,8 +29,14 @@ run_log_dir = os.path.join(FLAGS.log_dir, '{}_{}_{}ep'.format(
 
 
 def main(_):
-    print "Building", FLAGS.depth, "network, with", FLAGS.samples, "samples,",
-    print("with" if FLAGS.augment else "without"), "augmentation"
+    print "Using: ", FLAGS.depth, "network, with", FLAGS.samples, "samples,",
+    print ("with" if FLAGS.augment else "without"), "augmentation"
+
+    # Get augmented data with mel-spectrograms
+    train_set, test_set = utils.import_data(FLAGS.samples, FLAGS.augment)
+
+    # Build the tensorflow graph
+    print "Building Tensorflow Graph"
     tf.reset_default_graph()
 
     # Set up the inputs and Dataset object
@@ -74,44 +79,6 @@ def main(_):
     # log to console if the graph has been set up without errors
     print "  done "
 
-    # Import data, shorten if not all samples wanted, and convert to np.array
-    print "Loading data..."
-    with open('music_genres_dataset.pkl', 'rb') as f:
-        train_set, test_set = pickle.load(f), pickle.load(f)
-    train_set['data'] = train_set['data'][:FLAGS.samples]
-    train_set['labels'] = train_set['labels'][:FLAGS.samples]
-    train_set['track_id'] = train_set['track_id'][:FLAGS.samples]
-    test_set['labels'] = np.array(test_set['labels'], copy=False)
-    print "  done."
-
-    # Optionally Augment the Data by appending to the training set's lists
-    if FLAGS.augment:
-        print "Augmenting data..."
-        n_tracks = len(set(train_set['track_id']))
-        samples_per_track=train_set['track_id'].count(0)
-        for track_id in range(n_tracks):
-            # randomly choose three segments for each track
-            for random_choice in np.random.choice(range(samples_per_track), 3):
-                segment_index = random_choice + track_id * samples_per_track
-                # Apply each time-stretch to the segment
-                stretched_segments = [utils.time_stretch(train_set['data'][segment_index], factor)
-                                for factor in [0.2, 0.5, 1.2, 1.5]]
-                # Then apply pitch-shift to all of those
-                augmentations = [utils.pitch_shift(segment, factor)
-                                    for segment in stretched_segments
-                                    for factor in [-5, -2, 2, 5]]
-
-                # Append the extra samples to the training set
-                train_set['data'] += augmentations
-                train_set['track_id'] += [train_set['track_id'][segment_index]] *  len(augmentations)
-                train_set['labels'] += [train_set['labels'][segment_index]]*  len(augmentations)
-        print "  done."
-
-    # Calculate the Melsepctrograms from the audio files in the data lists
-    print "Calculating melspectrograms..."
-    train_set['melspectrograms'] = np.array(map(utils.melspectrogram, train_set['data']))
-    test_set['melspectrograms'] = np.array(map(utils.melspectrogram, test_set['data']))
-    print "  done."
 
     # Now everything has been set up, we can launch a Tensorflow Session
     with tf.Session() as sess:

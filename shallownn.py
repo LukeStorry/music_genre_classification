@@ -16,7 +16,7 @@ def graph(x, is_training):
         kernel_size=[10, 23],
         padding='same',
         activation=leaky_relu,
-        use_bias=True,  # TODO is this not meant to be True?
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='left_conv'
     )
@@ -26,14 +26,14 @@ def graph(x, is_training):
         kernel_size=[21, 20],
         padding='same',
         activation=leaky_relu,
-        use_bias=True,  # TODO is this not meant to be True?
+        use_bias=True,
         kernel_initializer=xavier_initializer,
         name='right_conv'
     )
     left_pooling = tf.layers.max_pooling2d(
         inputs=left_conv,
         pool_size=[1, 20],
-        strides=[1, 20],  # is this meant to match pool_size?
+        strides=[1, 20],
         name='left_pooling'
     )
     right_pooling = tf.layers.max_pooling2d(
