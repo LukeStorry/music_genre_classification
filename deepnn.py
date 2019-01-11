@@ -34,7 +34,7 @@ def graph(x, is_training):
     left_pooling_1 = tf.layers.max_pooling2d(
         inputs=left_conv_1,
         pool_size=[2, 2],
-        strides=[2, 2],  # TODO what should this be
+        strides=[2, 2],
         name='left_pooling'
     )
 

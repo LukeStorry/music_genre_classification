@@ -1,21 +1,25 @@
-# Deep Learning Coursework
-Replicating [Schindler's paper](https://publik.tuwien.ac.at/files/publik_256008.pdf)
+# Music Genre Classification with Tensorflow
 
----
+Replicating parts of Schindler's [paper](https://publik.tuwien.ac.at/files/publik_256008.pdf)
+on Comparing Shallow versus Deep Neural Network Architectures for Automatic Music Genre Classification.
 
-[Link to Question pdf](https://comsm0018-applied-deep-learning.github.io/Assessment/COMSM0018_Project_2018.pdf)
 
-[Link to given resources](https://goo.gl/VcTvNq)
+### Usage
+```python main.py [options]```
 
----
+command line options are:
+  - ```--depth [shallow or deep]``` (default shallow)
+  - ```--epochs [int]``` (default 100)
+  - ```--samples [int]``` (default 11250)
+  - ```--augment [bool]``` (default False)
+  - ```--batch_size [int]``` (default 16)
 
-[Link to our Overleaf paper](https://www.overleaf.com/8257455158fdsxbjmtpnkr)
+For example, to run a deep network with data-augmentation, with only 20 epochs and 1000 audio samples:
+```python main.py --depth deep --augment True --epochs 20 --samples 1000```
 
----
-# Data Structure
-* Pickle returns a dictionary for both test and training data sets indexed with **3** labels.
-* *'labels'* is a list of **int64**.
-* *'data'* is list of a **numpy array**.
-* *'track_id'* is a list of **int**.
-* The **training** data consists of **11250** examples.
-* The **test** data consists of **3750** examples. 
+
+### Requirements
+  - Tensorflow 1.6
+    - (The following is required for running on Blue Crystal)
+    ```module add languages/anaconda2/5.0.1.tensorflow-1.6.0```
+  - librosa
