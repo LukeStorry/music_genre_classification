@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 from time import strftime, localtime
 
-import utils
+import data
 import shallownn
 import deepnn
 
@@ -33,7 +33,7 @@ def main(_):
     print ("with" if FLAGS.augment else "without"), "augmentation"
 
     # Get augmented data with mel-spectrograms
-    train_set, test_set = utils.import_data(FLAGS.samples, FLAGS.augment)
+    train_set, test_set = data.get(FLAGS.samples, FLAGS.augment)
 
     # Build the tensorflow graph
     print "Building Tensorflow Graph"

@@ -54,7 +54,7 @@ def do_augmentation(data):
     print "  done."
 
 
-def import_data(samples, augment=False):
+def get(samples, augment=False):
     """Import data, remove unwanted samples, convert to np.array,
         optionally augment data, and calculate melspectrograms"""
 
