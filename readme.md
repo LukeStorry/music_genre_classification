@@ -3,6 +3,7 @@
 Replicating parts of Schindler's [paper](https://publik.tuwien.ac.at/files/publik_256008.pdf)
 on Comparing Shallow versus Deep Neural Network Architectures for Automatic Music Genre Classification.
 
+For COMSM0018.
 
 ### Usage
 ```python main.py [options]```
@@ -21,13 +22,6 @@ For example, to run a deep network with data-augmentation, with only 20 epochs a
 
 ### Requirements
   - Tensorflow 1.6
-    - (The following is required for running on Blue Crystal)
+    - (The following is required for running on Blue Crystal)\
     ```module add languages/anaconda2/5.0.1.tensorflow-1.6.0```
   - librosa
-
-### Files needed in folder to run
-  - main.py
-  - data.py
-  - deepnn.oy
-  - shallownn.py
-  - music_genres_dataset.pkl
