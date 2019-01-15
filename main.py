@@ -17,6 +17,8 @@ tf.app.flags.DEFINE_integer(
     'samples', 11250, 'How many training samples to use (default: %(default)d)')
 tf.app.flags.DEFINE_boolean(
     'augment', False, 'Whether to do Data-Augmentation. (default: %(default)d)')
+tf.app.flags.DEFINE_boolean(
+    'batch_normalisation', False, 'Whether to do Batch-Normalisation. (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'log_frequency', 10, 'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
@@ -55,9 +57,17 @@ def main(_):
 
     # Build the graph for the shallow network
     if FLAGS.depth == 'shallow':
-        graph = shallownn.graph
+        if FLAGS.batch_normalisation:
+            graph = shallownn.graph_with_batch_normalisation
+        else:
+            graph = shallownn.graph
     elif FLAGS.depth == 'deep':
-        graph = deepnn.graph
+        if FLAGS.batch_normalisation:
+            graph =  deepnn.graph_with_batch_normalisation
+        else:
+            network = deepnn.graph
+
+
     logits = graph(tf.reshape(spectrograms, [-1, 80, 80, 1]), training)
 
     # Define loss function, optimiser and training step
