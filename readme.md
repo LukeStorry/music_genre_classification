@@ -3,7 +3,7 @@
 Replicating parts of Schindler's [paper](https://publik.tuwien.ac.at/files/publik_256008.pdf)
 on Comparing Shallow versus Deep Neural Network Architectures for Automatic Music Genre Classification.
 
-For COMSM0018.
+For COMSM0018, designed to be run efficiently on the University of Bristol's BC4 supercomputer.
 
 ### Usage
 ```python main.py [options]```
